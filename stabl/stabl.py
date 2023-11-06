@@ -21,11 +21,11 @@ from tqdm.autonotebook import tqdm
 from .unionfind import UnionFind
 import warnings
 
-from julia.api import Julia
-jl = Julia(compiled_modules=False)
+# from julia.api import Julia
+# jl = Julia(compiled_modules=False)
 
-from julia import Distributions as dist
-from julia import Bigsimr as bs
+# from julia import Distributions as dist
+# from julia import Bigsimr as bs
 
 
 def ss_cv(X, y, stab_sel):
@@ -1233,29 +1233,29 @@ class Stabl(SelectorMixin, BaseEstimator):
         elif artificial_type == "knockoff":
 
             def generate_noise(X_a):
-                corr = self.corr
-                feat_type = self.feat_type
+                # corr = self.corr
+                # feat_type = self.feat_type
                 # print(f"\n Generate noise : {feat_type} {corr}\n")
-                if feat_type is None or feat_type == "normal":
-                    return GaussianSampler(np.array(X_a), method='equicorrelated').sample_knockoffs()
+                # if feat_type is None or feat_type == "normal":
+                return GaussianSampler(np.array(X_a), method='equicorrelated').sample_knockoffs()
 
-                X_b = pd.read_csv(f"./Norta/normal {corr}.csv", index_col=0).loc[X_a.index, X_a.columns]
-                X_b = (X_b - X_b.mean())/X_b.std()
-                X_artificial = GaussianSampler(np.array(X_b), method='equicorrelated').sample_knockoffs()
-                if "NB" in feat_type:
-                    margin = dist.NegativeBinomial(2, 0.1)
-                    for i in range(X_artificial.shape[1]):
-                        X_artificial[:, i] = bs.normal_to_margin(margin, X_artificial[:, i])
+                # X_b = pd.read_csv(f"./Norta/normal {corr}.csv", index_col=0).loc[X_a.index, X_a.columns]
+                # X_b = (X_b - X_b.mean())/X_b.std()
+                # X_artificial = GaussianSampler(np.array(X_b), method='equicorrelated').sample_knockoffs()
+                # if "NB" in feat_type:
+                #     margin = dist.NegativeBinomial(2, 0.1)
+                #     for i in range(X_artificial.shape[1]):
+                #         X_artificial[:, i] = bs.normal_to_margin(margin, X_artificial[:, i])
 
-                if "ZI" in feat_type:
-                    indices = rng.choice(X_artificial.size, X_artificial.size // 5, replace=False)
-                    old_shape = X_artificial.shape
-                    X_artificial = X_artificial.reshape(-1)
-                    X_artificial[indices] = 0
-                    X_artificial = X_artificial.reshape(old_shape)
+                # if "ZI" in feat_type:
+                #     indices = rng.choice(X_artificial.size, X_artificial.size // 5, replace=False)
+                #     old_shape = X_artificial.shape
+                #     X_artificial = X_artificial.reshape(-1)
+                #     X_artificial[indices] = 0
+                #     X_artificial = X_artificial.reshape(old_shape)
 
-                X_artificial = (X_artificial - np.mean(X_artificial, axis=0))/np.std(X_artificial, axis=0)
-                return np.array(X_artificial)
+                # X_artificial = (X_artificial - np.mean(X_artificial, axis=0))/np.std(X_artificial, axis=0)
+                # return np.array(X_artificial)
 
             np.random.seed(random_state)
             rng = np.random.default_rng(seed=random_state)
