@@ -55,7 +55,7 @@ def run(idx):
         lifIdx = v%lifCount
         idxList[3] = lifIdx
         idxList[varType] = varIdx
-        varValue = params["preprocessing"][varNamesFull[varIdx]][varIdx]
+        varValue = params["preprocessing"][varNamesFull[varType]][varIdx]
         lifValue = params["preprocessing"]["lifThresh"][lifIdx]
 
         title = f"{modelName}-{varNames[varIdx]}{varValue}-lif{lifValue}"
@@ -90,7 +90,7 @@ def run(idx):
         idxList[varType] = varIdx
         idxList.extend([artificialTypeIdx,artificialPropIdx,sampleFracIdx])
 
-        varValue = params["preprocessing"][varNamesFull[varIdx]][varIdx]
+        varValue = params["preprocessing"][varNamesFull[varType]][varIdx]
         lifValue = params["preprocessing"]["lifThresh"][lifIdx]
         artificialType = params["stabl_general"]["artificalTypes"][artificialTypeIdx]
         artificialProp = params["stabl_general"]["artificalProportions"][artificialPropIdx]

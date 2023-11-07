@@ -33,7 +33,7 @@ inner_group_cv = GroupShuffleSplit(n_splits=25, test_size=0.2, random_state=42)
 
 nb_param = 50
 
-logit = LogisticRegression(penalty=None, class_weight="balanced", max_iter=int(1e6), random_state=42)
+logit = LogisticRegression(penalty='none', class_weight="balanced", max_iter=int(1e6), random_state=42)
 linreg = LinearRegression()
 
 preprocessing = Pipeline(

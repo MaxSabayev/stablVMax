@@ -12,7 +12,7 @@ import pandas as pd
 from sklearn.exceptions import ConvergenceWarning
 from sklearn.utils._testing import ignore_warnings
 
-logit = LogisticRegression(penalty=None, class_weight="balanced", max_iter=int(1e6), random_state=42)
+logit = LogisticRegression(penalty='none', class_weight="balanced", max_iter=int(1e6), random_state=42)
 linreg = LinearRegression()
 
 def _make_groups(X, percentile):
@@ -89,7 +89,7 @@ def single_omic_simple(
     predictions = pd.DataFrame(data=None, index=y.index)
     selected_features= []
     stabl_features= pd.DataFrame(data=None, columns=["Threshold", "min FDP+"])
-    best_params = None
+    best_params = []
 
     k = 1
     for train, test in (tbar := tqdm(
@@ -123,7 +123,7 @@ def single_omic_simple(
         )
 
         # __STABL__
-        if "STABL" in estimator_name:
+        if "stabl" in estimator_name:
             estimator.fit(X_tmp_std, y_tmp, groups=groups)
             tmp_sel_features = list(estimator.get_feature_names_out())
             fold_selected_features.extend(tmp_sel_features)
@@ -132,7 +132,7 @@ def single_omic_simple(
 
 
 
-        if estimator_name in ["Lasso", "ALasso","ElasticNet"]:
+        if estimator_name in ["lasso", "alasso","en"]:
             model = clone(estimator)
             if task_type == "binary":
                 pred = model.fit(X_tmp_std, y_tmp, groups=groups).predict_proba(X_test_tmp_std)[:, 1]
@@ -144,7 +144,7 @@ def single_omic_simple(
             best_params.append(model.best_params_)
 
 
-        if estimator_name == f"SGL-{sgl_corr}":
+        if estimator_name == f"sgl-{sgl_corr}":
             model = clone(estimator)
             groups_sgl = _make_groups(X_tmp_std, sgl_corr)
             setattr(model.estimator, "groups", groups_sgl)
@@ -157,7 +157,7 @@ def single_omic_simple(
             predictions.loc[test_idx_tmp, f"Fold #{k}"] = pred
             best_params.append(model.best_params_)
 
-        if "STABL" in estimator_name:
+        if "stabl" in estimator_name:
             X_train = data.loc[train_idx, fold_selected_features]
             X_test = data.loc[test_idx, fold_selected_features]
             y_train = y.loc[train_idx]
@@ -184,15 +184,15 @@ def single_omic_simple(
 
                 # __Final Models__
                 if task_type == "binary":
-                    predictions = clone(logit).fit(X_train, y_train).predict_proba(X_test)[:, 1].flatten()
+                    pred = clone(logit).fit(X_train, y_train).predict_proba(X_test)[:, 1].flatten()
 
                 elif task_type == "regression":
-                    predictions = clone(linreg).fit(X_train, y_train).predict(X_test)
+                    pred = clone(linreg).fit(X_train, y_train).predict(X_test)
 
                 else:
                     raise ValueError("task_type not recognized.")
 
-                predictions.loc[test_idx, f"Fold #{k}"] = predictions
+                predictions.loc[test_idx, f"Fold #{k}"] = pred
 
             else:
                 if task_type == "binary":
@@ -206,7 +206,8 @@ def single_omic_simple(
 
         selected_features.append(fold_selected_features)
         # print("~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~\n")
-
+        
+  
         k += 1
 
     # __SAVING_RESULTS__
@@ -214,13 +215,13 @@ def single_omic_simple(
     if y.name is None:
         y.name = "outcome"
 
-    # formatted_features = pd.DataFrame(
-    #         data={
-    #             "Fold selected features": selected_features,
-    #             "Fold nb of features": [len(el) for el in selected_features]
-    #         },
-    #         index=[f"Fold {i}" for i in range(outer_splitter.get_n_splits(X=data))]
-    #     )
+    formatted_features = pd.DataFrame(
+            data={
+                "Fold selected features": selected_features,
+                "Fold nb of features": [len(el) for el in selected_features]
+            },
+            index=[f"Fold {i}" for i in range(outer_splitter.get_n_splits(X=data))]
+        )
 
     predictions = predictions.median(axis=1)
 
@@ -274,6 +275,6 @@ def single_omic_simple(
     #     table_of_scores.append(cell_value)
 
 
-    return predictions,selected_features
+    return predictions,formatted_features
 
         

@@ -71,8 +71,8 @@ def generateModel(idxList,modelName,paramFilePath):
     if modelName[:5] == "stabl":
         nBootstraps = params["stabl_general"]["n_bootstraps"]
         replace = params["stabl_general"]["replace"]
-        artificialType = params["stabl_general"]["artificalTypes"][idxList[4]]
-        artificalProp = params["stabl_general"]["artificalProportions"][idxList[5]]
+        artificialType = params["stabl_general"]["artificialTypes"][idxList[4]]
+        artificalProp = params["stabl_general"]["artificialProportions"][idxList[5]]
         sampleFraction = params["stabl_general"]["sampleFractions"][idxList[6]]
         a1,b1,c1 = params["stabl_general"]["fdrThreshParams"]
 
@@ -150,6 +150,6 @@ def generateModel(idxList,modelName,paramFilePath):
                     verbose=1
                 )
     
-    return model
+    return preprocessing,model
             
         
