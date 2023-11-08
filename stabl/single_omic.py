@@ -215,12 +215,13 @@ def single_omic_simple(
     if y.name is None:
         y.name = "outcome"
 
+
     formatted_features = pd.DataFrame(
             data={
                 "Fold selected features": selected_features,
                 "Fold nb of features": [len(el) for el in selected_features]
             },
-            index=[f"Fold {i}" for i in range(outer_splitter.get_n_splits(X=data,groups=groups))]
+            index=[f"Fold {i}" for i in range(outer_splitter.get_n_splits(X=data,groups=outer_groups))]
         )
 
     predictions = predictions.median(axis=1)
