@@ -17,12 +17,12 @@ from groupyr import SGL, LogisticSGL
 from sklearn.base import clone
 
 
-chosen_inner_cv = RepeatedStratifiedKFold(n_splits=5, n_repeats=5, random_state=42)
+
 
 
 task_type = "binary"
 
-def generateModel(idxList,modelName,paramFilePath):
+def generateModel(idxList,modelName,paramFilePath,chosen_inner_cv = RepeatedStratifiedKFold(n_splits=5, n_repeats=5, random_state=42)):
     params = json.loads(open(paramFilePath).read())
     useVarThresh = params["preprocessing"]["useVarThresh"]
     useVarPercentile = params["preprocessing"]["useVarPercentile"]

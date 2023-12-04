@@ -27,9 +27,9 @@
         "n_bootstraps" : 500,
         "replace" : true,
         "artificialTypes" : ["random_permutation","knockoff"],
-        "artificialProportions" : [1,0.5,0.3],
-        "sampleFractions": [0.5,1],
-        "fdrThreshParams": [0.1,1,0.01]
+        "artificialProportions" : [1.0],
+        "sampleFractions": [0.5,1.0],
+        "fdrThreshParams": [0.1,1.0,0.01]
     },
     "stabl_lasso": {
         "use" : true,
@@ -37,7 +37,6 @@
     },
     "stabl_alasso": {
         "use" : true,
-        "fdrThreshParams": [0.1,1,0.01],
         "clogParams" : [-2,1,10]
     },
     "stabl_en": {
