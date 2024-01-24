@@ -1,0 +1,55 @@
+{
+    "use" :{ 
+        "varType" : "thresh",
+        "models": {
+            "lasso" : true,
+            "alasso" : true,
+            "en" : true,
+            "stabl_lasso" : true,
+            "stabl_alasso" : true,
+            "stabl_en" : true
+        }
+    },
+    "preprocessing" : {
+        "varValues": [0,0.01,0.1],
+        "lifThresh" : [0.2]
+    },
+    "lasso" :  {
+        "c" : {"type" : "log", "val" : [-2,2,30]}
+    },
+    "alasso" : {
+        "c" : {"type" : "log", "val" : [-2,2,30]}
+    },
+    "en": { 
+        "c" : {"type" : "log", "val" : [-2,1,10]},
+        "l1_ratio": {"type" : "lin", "val" : [0.1,0.9,5]}
+    },
+    "sgl": {
+        "alpha" : {"type" : "log", "val" : [-2,1,10]},
+        "l1_ratio": {"type" : "lin", "val" : [0.5,0.9,3]},
+        "corrValues": [90,95]
+    },
+    "stabl_general": {
+        "n_bootstraps" : 500,
+        "replace" : true,
+        "artificialTypes" : ["random_permutation","knockoff"],
+        "artificialProportions" : [1.0],
+        "sampleFractions": [0.5,1.0],
+        "fdrThreshParams": [0.1,1.0,0.01]
+    },
+    "stabl_lasso": {
+        "c" : {"type" : "log", "val" : [-2,1,10]}
+    },
+    "stabl_alasso": {
+        "c" : {"type" : "log", "val" : [-2,1,10]},
+    },
+    "stabl_en": {
+        "c" : {"type" : "log", "val" : [-2,1,10]},
+        "l1_ratio": {"type" : "lin", "val" : [0.1,0.9,5]}
+    },
+    "stabl_sgl": {
+        "alpha" : {"type" : "log", "val" : [-2,1,10]},
+        "l1_ratio": {"type" : "lin", "val" : [0.5,0.9,3]},
+        "corrValues": [90,95]
+    }
+}

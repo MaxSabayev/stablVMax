@@ -1,9 +1,5 @@
 #!/usr/bin/env python3
 
-"""
-    Donoho Lab Experiment Management System
-"""
-
 import copy
 import json
 import logging
@@ -16,18 +12,18 @@ from pathlib import Path
 
 import pandas as pd
 from pandas import DataFrame
-import pandas_gbq.exceptions
+# import pandas_gbq.exceptions
 from dask.distributed import Client, as_completed
-from google.cloud.sql.connector import Connector
-from google.oauth2 import service_account
-from pg8000.dbapi import Connection
-from sqlalchemy import create_engine
-from sqlalchemy.engine import Engine
-from sqlalchemy.exc import SQLAlchemyError, OperationalError
-from sqlalchemy.schema import MetaData
+# from google.cloud.sql.connector import Connector
+# from google.oauth2 import service_account
+# from pg8000.dbapi import Connection
+# from sqlalchemy import create_engine
+# from sqlalchemy.engine import Engine
+# from sqlalchemy.exc import SQLAlchemyError, OperationalError
+# from sqlalchemy.schema import MetaData
 
 BATCH_SIZE = 4096
-NUM_CELLS = 200 * 1000  # 200 rows x 1,000 columns. Slightly less than the values used on FarmShare
+
 logger = logging.getLogger(__name__)
 
 
@@ -35,12 +31,12 @@ def _now() -> datetime:
     return datetime.now(timezone.utc)
 
 
-def _touch_db_url(db_url: str):
-    db_path = db_url.split('sqlite:///')
-    if db_path[0] != db_url:  # If the string was found …
-        p = Path(db_path[1])
-        p.parent.mkdir(parents=True, exist_ok=True)
-        p.touch(exist_ok=True)
+# def _touch_db_url(db_url: str):
+#     db_path = db_url.split('sqlite:///')
+#     if db_path[0] != db_url:  # If the string was found …
+#         p = Path(db_path[1])
+#         p.parent.mkdir(parents=True, exist_ok=True)
+#         p.touch(exist_ok=True)
 
 
 # class Databases(object):
@@ -187,72 +183,72 @@ def _touch_db_url(db_url: str):
 
 # The Cloud SQL Python Connector can be used along with SQLAlchemy using the
 # 'creator' argument to 'create_engine'
-def create_remote_connection_engine() -> Engine:
-    def get_conn() -> Connection:
-        connector = Connector()
-        connection: Connection = connector.connect(
-            os.environ["POSTGRES_CONNECTION_NAME"],
-            "pg8000",
-            user=os.environ["POSTGRES_USER"],
-            password=os.environ["POSTGRES_PASS"],
-            db=os.environ["POSTGRES_DB"],
-        )
-        return connection
+# def create_remote_connection_engine() -> Engine:
+#     def get_conn() -> Connection:
+#         connector = Connector()
+#         connection: Connection = connector.connect(
+#             os.environ["POSTGRES_CONNECTION_NAME"],
+#             "pg8000",
+#             user=os.environ["POSTGRES_USER"],
+#             password=os.environ["POSTGRES_PASS"],
+#             db=os.environ["POSTGRES_DB"],
+#         )
+#         return connection
 
-    engine = create_engine(
-        "postgresql+pg8000://",
-        creator=get_conn,
-        echo=False,
-        pool_pre_ping=True  # Force reestablishing the connection.
-    )
-    engine.dialect.description_encoding = None
-    return engine
-
-
-def active_remote_engine() -> (Engine, MetaData):
-    remote = create_remote_connection_engine()
-    metadata = MetaData()
-    try:
-        metadata.reflect(remote)  # Causes a DB query.
-        return remote, metadata
-    except SQLAlchemyError as e:
-        logger.error("%s", e)
-        remote.dispose()
-    return None, None
+#     engine = create_engine(
+#         "postgresql+pg8000://",
+#         creator=get_conn,
+#         echo=False,
+#         pool_pre_ping=True  # Force reestablishing the connection.
+#     )
+#     engine.dialect.description_encoding = None
+#     return engine
 
 
-def get_gbq_credentials(cred_name: str = 'hs-deep-lab-donoho-3d5cf4ffa2f7.json') -> service_account.Credentials:
-    path = f'~/.config/gcloud/{cred_name}'  # Pandas-GBQ-DataSource
-    expanded_path = os.path.expanduser(path)
-    credentials = service_account.Credentials.from_service_account_file(expanded_path)
-    return credentials
+# def active_remote_engine() -> (Engine, MetaData):
+#     remote = create_remote_connection_engine()
+#     metadata = MetaData()
+#     try:
+#         metadata.reflect(remote)  # Causes a DB query.
+#         return remote, metadata
+#     except SQLAlchemyError as e:
+#         logger.error("%s", e)
+#         remote.dispose()
+#     return None, None
 
 
-def unroll_parameters(parameters: dict) -> list:
-    """
-    'parameters': {
-        'm': [50],
-        'n': [1275, 2550, 3825],
-        'mc': list(range(50)),
-        'c4': linspace(0.25, 2.5, 10),
-        'p': concatenate((linspace(0.02, 0.10, 9), linspace(0.15, 0.50, 8))),
-        'q_type': [21],
-        'd_type': [3]
-        }
-    """
-    unrolled = []
-    for key, values in parameters.items():
-        next_unroll = []
-        for value in values:
-            roll = copy.deepcopy(unrolled)
-            if len(roll) > 0:
-                for param in roll:
-                    param[key] = value
-            else:
-                roll.append({key: value})
-            next_unroll.extend(roll)
-        unrolled = next_unroll
-    return unrolled
+# def get_gbq_credentials(cred_name: str = 'hs-deep-lab-donoho-3d5cf4ffa2f7.json') -> service_account.Credentials:
+#     path = f'~/.config/gcloud/{cred_name}'  # Pandas-GBQ-DataSource
+#     expanded_path = os.path.expanduser(path)
+#     credentials = service_account.Credentials.from_service_account_file(expanded_path)
+#     return credentials
+
+
+# def unroll_parameters(parameters: dict) -> list:
+#     """
+#     'parameters': {
+#         'm': [50],
+#         'n': [1275, 2550, 3825],
+#         'mc': list(range(50)),
+#         'c4': linspace(0.25, 2.5, 10),
+#         'p': concatenate((linspace(0.02, 0.10, 9), linspace(0.15, 0.50, 8))),
+#         'q_type': [21],
+#         'd_type': [3]
+#         }
+#     """
+#     unrolled = []
+#     for key, values in parameters.items():
+#         next_unroll = []
+#         for value in values:
+#             roll = copy.deepcopy(unrolled)
+#             if len(roll) > 0:
+#                 for param in roll:
+#                     param[key] = value
+#             else:
+#                 roll.append({key: value})
+#             next_unroll.extend(roll)
+#         unrolled = next_unroll
+    # return unrolled
 
 
 def unroll_parameters_gpt(parameters: dict) -> list:
@@ -341,42 +337,42 @@ def unroll_experiment(experiment: dict) -> list:
     return parameters
 
 
-def dedup_experiment(df: DataFrame, params: list) -> list:
-    dedup = []
-    if len(params) > 0:
-        keys = sorted(params[0].keys())
-        df_values = set(tuple(row) for row in df[keys].to_numpy())
+# def dedup_experiment(df: DataFrame, params: list) -> list:
+#     dedup = []
+#     if len(params) > 0:
+#         keys = sorted(params[0].keys())
+#         df_values = set(tuple(row) for row in df[keys].to_numpy())
 
-        for p in params:
-            values = tuple(p[k] for k in keys)
-            if values not in df_values:
-                dedup.append(p)
-                df_values.add(values)
-    return dedup
-
-
-def do_test_experiment(experiment: dict, instance: callable, client: Client,
-                       remote: Engine = None,
-                       credentials: service_account.credentials = None, project_id: str = None):
-    # Read the DB level parameters.
-    table_name = experiment['table_name']
-    db = Databases(table_name, remote, credentials, project_id)
-
-    # Save the experiment domain.
-    record_experiment(experiment)
-
-    # Prepare parameters.
-    parameters = unroll_experiment(experiment)
-    df = db.read_params(parameters)
-    if df is not None and len(df.index) > 0:
-        parameters = dedup_experiment(df, parameters)
-    df = None  # Free up the DataFrame.
-    random.shuffle(parameters)
-    instance_count = len(parameters)
-    logger.info(f'Number of Instances to calculate: {instance_count}')
+#         for p in params:
+#             values = tuple(p[k] for k in keys)
+#             if values not in df_values:
+#                 dedup.append(p)
+#                 df_values.add(values)
+#     return dedup
 
 
-def do_experiment(instance: callable, parameters: list, db: Databases, client: Client):
+# def do_test_experiment(experiment: dict, instance: callable, client: Client,
+#                        remote: Engine = None,
+#                        credentials: service_account.credentials = None, project_id: str = None):
+#     # Read the DB level parameters.
+#     table_name = experiment['table_name']
+#     db = Databases(table_name, remote, credentials, project_id)
+
+#     # Save the experiment domain.
+#     record_experiment(experiment)
+
+#     # Prepare parameters.
+#     parameters = unroll_experiment(experiment)
+#     df = db.read_params(parameters)
+#     if df is not None and len(df.index) > 0:
+#         parameters = dedup_experiment(df, parameters)
+#     df = None  # Free up the DataFrame.
+#     random.shuffle(parameters)
+#     instance_count = len(parameters)
+#     logger.info(f'Number of Instances to calculate: {instance_count}')
+
+
+def do_experiment(instance: callable, parameters: list, client: Client): #db: Databases):
     instance_count = len(parameters)
     i = 0
     logger.info(f'Number of Instances to calculate: {instance_count}')
@@ -393,10 +389,10 @@ def do_experiment(instance: callable, parameters: list, db: Databases, client: C
                 logger.info(f'Count: {i}; Time: {round(tock)}; Seconds/Instance: {s_i:0.4f}; ' +
                             f'Remaining (s): {round(remaining_count * s_i)}; Remaining Count: {remaining_count}')
                 logger.info(result)
-            db.batch_result(result)
+            # db.batch_result(result)
             future.release()  # As these are Embarrassingly Parallel tasks, clean up memory.
-        db.push_batch()
-    db.final_push()
+        # db.push_batch()
+    # db.final_push()
     total_time = time.perf_counter() - tick
     logger.info(f"Performed experiment in {total_time:0.4f} seconds")
     if instance_count > 0:
@@ -407,17 +403,17 @@ def do_on_cluster(experiment: dict, instance: callable, client: Client):
     logger.info(f'{client}')
     # Read the DB level parameters.
 
-    db = None # This is the dataset
+    # db = None # This is the dataset
 
     # Save the experiment domain.
     record_experiment(experiment)
 
     # Prepare parameters.
     parameters = unroll_experiment(experiment)
-    df = db.read_params(parameters)
-    if df is not None and len(df.index) > 0:
-        parameters = dedup_experiment(df, parameters)
-    df = None  # Free up the DataFrame.
+    # df = db.read_params(parameters)
+    # if df is not None and len(df.index) > 0:
+    #     parameters = dedup_experiment(df, parameters)
+    # df = None  # Free up the DataFrame.
     if len(parameters) > 0:
         random.shuffle(parameters)
         do_experiment(instance, parameters, db, client)
@@ -425,18 +421,3 @@ def do_on_cluster(experiment: dict, instance: callable, client: Client):
         logger.warning('Database is complete.')
     client.shutdown()
 
-
-if __name__ == '__main__':
-    db_url = 'sqlite:///data/EMS.db3'
-    _touch_db_url(db_url)
-    # d = {
-    #     'm': [50],
-    #     'n': [1275, 2550, 3825],
-    #     'mc': list(range(50)),
-    #     'c4': np.linspace(0.25, 2.5, 10),
-    #     'p': np.linspace(0.02, 0.10, 9),
-    #     'q_type': [21],
-    #     'd_type': [3]
-    #     }
-    # p = unroll_parameters_gpt(d)
-    # print(p)
