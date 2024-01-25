@@ -24,5 +24,7 @@ setuptools.setup(
         "adjustText==0.8",
         "scipy==1.10.1",
         "osqp==0.6.2",
+        "dask distributed",
+        "dask_jobqueue"
     ]
 )
