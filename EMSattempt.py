@@ -9,7 +9,7 @@ import time
 from datetime import datetime, timezone, timedelta
 from math import floor
 from pathlib import Path
-
+import itertools
 import pandas as pd
 from pandas import DataFrame
 # import pandas_gbq.exceptions
@@ -264,7 +264,7 @@ def unroll_parameters_gpt(parameters: dict) -> list:
         }
     """
     unrolled = []
-    import itertools
+    
 
     # Get all possible combinations of values from the lists
     combinations = list(itertools.product(*parameters.values()))
@@ -276,12 +276,12 @@ def unroll_parameters_gpt(parameters: dict) -> list:
     return unrolled
 
 
-def update_index(index: int, df: DataFrame) -> DataFrame:
-    as_list = df.index.tolist()
-    for i in range(len(as_list)):
-        as_list[i] = index + i
-    df.index = as_list
-    return df
+# def update_index(index: int, df: DataFrame) -> DataFrame:
+#     as_list = df.index.tolist()
+#     for i in range(len(as_list)):
+#         as_list[i] = index + i
+#     df.index = as_list
+#     return df
 
 
 def remove_stop_list(unrolled: list, stop: list) -> list:

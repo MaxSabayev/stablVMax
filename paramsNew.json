@@ -41,7 +41,7 @@
         "c" : {"type" : "log", "val" : [-2,1,10]}
     },
     "stabl_alasso": {
-        "c" : {"type" : "log", "val" : [-2,1,10]},
+        "c" : {"type" : "log", "val" : [-2,1,10]}
     },
     "stabl_en": {
         "c" : {"type" : "log", "val" : [-2,1,10]},
