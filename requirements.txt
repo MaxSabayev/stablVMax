@@ -1,0 +1,1 @@
+pytz, pyglmnet, tqdm, threadpoolctl, PyYAML, python-dateutil, pybind11, pillow, numpy, networkx, kiwisolver, joblib, fonttools, et-xmlfile, cycler, scipy, pyaml, patsy, pandas, openpyxl, matplotlib, statsmodels, seaborn, scs, scikit-learn, qdldl, ecos, clarabel, adjustText, scikit-optimize, osqp, group_lasso, copt, groupyr, cvxpy, knockpy, Stabl

@@ -21,11 +21,11 @@ from tqdm.autonotebook import tqdm
 from .unionfind import UnionFind
 import warnings
 
-from julia.api import Julia
-jl = Julia(compiled_modules=False)
+# from julia.api import Julia
+# jl = Julia(compiled_modules=False)
 
-from julia import Distributions as dist
-from julia import Bigsimr as bs
+# from julia import Distributions as dist
+# from julia import Bigsimr as bs
 
 
 def ss_cv(X, y, stab_sel):
