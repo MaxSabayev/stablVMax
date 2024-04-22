@@ -34,11 +34,6 @@
         "C" : {"type" : "log", "val" : [-2,1,10]},
         "l1_ratio": {"type" : "lin", "val" : [0.1,0.9,5]}
     },
-    "sgl": {
-        "alpha" : {"type" : "log", "val" : [-2,1,10]},
-        "l1_ratio": {"type" : "lin", "val" : [0.5,0.9,3]},
-        "corrValues": [90,95]
-    },
     "stabl_lasso": {
         "C" : {"type" : "log", "val" : [-2,1,10]}
     },
@@ -48,10 +43,5 @@
     "stabl_en": {
         "C" : {"type" : "log", "val" : [-2,1,10]},
         "l1_ratio": {"type" : "lin", "val" : [0.1,0.9,5]}
-    },
-    "stabl_sgl": {
-        "alpha" : {"type" : "log", "val" : [-2,1,10]},
-        "l1_ratio": {"type" : "lin", "val" : [0.5,0.9,3]},
-        "corrValues": [90,95]
     }
 }

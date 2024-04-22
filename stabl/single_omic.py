@@ -144,19 +144,6 @@ def single_omic_simple(
             best_params.append(model.best_params_)
 
 
-        if estimator_name == f"sgl-{sgl_corr}":
-            model = clone(estimator)
-            groups_sgl = _make_groups(X_tmp_std, sgl_corr)
-            setattr(model.estimator, "groups", groups_sgl)
-            if task_type == "binary":
-                pred = model.fit(X_tmp_std, y_tmp, groups=groups).predict_proba(X_test_tmp_std)[:, 1]
-            else:
-                pred = model.fit(X_tmp_std, y_tmp, groups=groups).predict(X_test_tmp_std)
-            tmp_sel_features = list(X_tmp_std.columns[np.where(model.best_estimator_.coef_.flatten())])
-            fold_selected_features.extend(tmp_sel_features)
-            predictions.loc[test_idx_tmp, f"Fold #{k}"] = pred
-            best_params.append(model.best_params_)
-
         if "stabl" in estimator_name:
             X_train = data.loc[train_idx, fold_selected_features]
             X_test = data.loc[test_idx, fold_selected_features]
