@@ -13,7 +13,7 @@ from sklearn.model_selection import RepeatedStratifiedKFold, GroupShuffleSplit, 
 from sklearn.linear_model import LogisticRegression, Lasso, ElasticNet
 from stabl.stabl import Stabl, group_bootstrap
 from stabl.adaptive import ALogitLasso, ALasso
-from groupyr import SGL, LogisticSGL
+
 from sklearn.base import clone
 
 
@@ -61,12 +61,6 @@ def generateModel(idxList,modelName,paramFilePath,chosen_inner_cv = RepeatedStra
         a2,b2,c2 = params[modelName]["l1ratiolinParams"]
         en = LogisticRegression(penalty='elasticnet',solver='saga',class_weight='balanced',max_iter=int(1e3),random_state=42)
         model = GridSearchCV(en, param_grid={"C": np.logspace(a1,b1,c1), "l1_ratio": np.linspace(a2,b2,c2)}, scoring="roc_auc", cv=chosen_inner_cv, n_jobs=-1)
-
-    if modelName == "sgl":
-        a1,b1,c1 = params[modelName]["alphalogParams"]
-        a2,b2,c2 = params[modelName]["l1ratiolinParams"]
-        sgl = LogisticSGL(max_iter=int(1e3), l1_ratio=0.5)
-        model = GridSearchCV(sgl, scoring='roc_auc', param_grid={"alpha": np.logspace(a1,b1,c1), "l1_ratio": np.linspace(a2,b2,c2)}, cv=chosen_inner_cv, n_jobs=-1)
 
     if modelName[:5] == "stabl":
         nBootstraps = params["stabl_general"]["n_bootstraps"]
@@ -130,25 +124,6 @@ def generateModel(idxList,modelName,paramFilePath,chosen_inner_cv = RepeatedStra
                     verbose=1
                 )
             
-        if modelName == "stabl_sgl":
-            a2,b2,c2 = params[modelName]["alphalogParams"]
-            a3,b3,c3 = params[modelName]["l1ratiolinParams"]
-            l1params = np.linspace(a3,b3,c3)
-            lambdaGrid = [ {"alpha": np.logspace(a2,b2,c3),"l1_ratio": [v]} for v in l1params]
-
-            model = Stabl(
-                    LogisticSGL(max_iter=int(1e3), l1_ratio=0.5),
-                    n_bootstraps=nBootstraps,
-                    artificial_type=artificialType,
-                    artificial_proportion=artificalProp,
-                    replace=replace,
-                    fdr_threshold_range=np.arange(a1,b1,c1),
-                    sample_fraction=sampleFraction,
-                    random_state=42,
-                    lambda_grid=lambdaGrid,
-                    perc_corr_group_threshold=params[modelName]["corrValues"][idxList[7]],
-                    verbose=1
-                )
     
     return preprocessing,model
             

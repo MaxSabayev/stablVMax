@@ -73,6 +73,7 @@ def unroll_parameters(params: dict) -> list:
     experiments.extend([{key: value for key, value in zip(stablParams.keys(), combo)} for combo in itertools.product(*stablParams.values())])
     for exp in experiments:
         exp["varType"] = params["general"]["varType"]
+        exp["innerCVvals"] = params["general"]["innerCVvals"]
         for modelVariableName in params[exp["model"]].keys():
             exp[modelVariableName] = spacerize(params[exp["model"]][modelVariableName])
         exp["varNames"] = list(params[exp["model"]].keys())
@@ -115,7 +116,7 @@ def generateModel(paramSet: dict):
         model = Stabl(
                     submodel,
                     n_bootstraps=paramSet["n_bootstraps"],
-                    artificial_type=paramSet["artificalTypes"],
+                    artificial_type=paramSet["artificialTypes"],
                     artificial_proportion=paramSet["artificialProportions"],
                     replace=paramSet["replace"],
                     fdr_threshold_range=np.arange(*paramSet["fdrThreshParams"]),
@@ -125,7 +126,7 @@ def generateModel(paramSet: dict):
                     verbose=1
                 )
     else:
-        chosen_inner_cv = RepeatedStratifiedKFold(*paramSet["general"]["innerCVvals"], random_state=42)
+        chosen_inner_cv = RepeatedStratifiedKFold(n_splits=paramSet["innerCVvals"][0],n_repeats=paramSet["innerCVvals"][1], random_state=42)
         model = GridSearchCV(submodel, param_grid=lambdaGrid, 
                              scoring="roc_auc", cv=chosen_inner_cv, n_jobs=-1)
     
