@@ -104,8 +104,7 @@ def generateModel(paramSet: dict):
         submodel = LogisticRegression(penalty='elasticnet',solver='saga',
                                         class_weight='balanced',max_iter=int(1e6),random_state=42)
         if "stabl" in paramSet["model"]:
-            lambdaGrid = [ {b:c for b,c in zip(paramSet["varNames"],a)} for a in itertools.product(*[
-                            [paramSet[v]] if ii ==0 else [paramSet[v]] for ii,v in enumerate(paramSet["varNames"])] )]
+            lambdaGrid = [{b:paramSet[b] for b in paramSet["varNames"]}]
         # case "sgl":
         #     submodel = LogisticSGL(max_iter=int(1e3), l1_ratio=0.5)
     else:
@@ -141,7 +140,7 @@ def do_experiment(instance: callable, parameters: list, client: Client): #db: Da
     logger.info(f'Number of Instances to calculate: {instance_count}')
     # Start the computation.
     tick = time.perf_counter()
-    futures = client.map(lambda p: instance(**p), parameters, batch_size=BATCH_SIZE)
+    futures = client.map(lambda p: instance(p), parameters, batch_size=BATCH_SIZE)
     for batch in as_completed(futures, with_results=True).batches():
         for future, result in batch:
             i += 1
@@ -160,9 +159,9 @@ def do_experiment(instance: callable, parameters: list, client: Client): #db: Da
         logger.info(f"Count: {instance_count}, Seconds/Instance: {(total_time / instance_count):0.4f}")
 
 
-def do_on_cluster(parameterList: dict, function: callable, client: Client):
+def do_on_cluster(parameterPath: str, function: callable, client: Client):
     logger.info(f'{client}')
-
+    parameterList = read_json(parameterPath)
     # Save the experiment domain.
     record_experiment(parameterList)
 
