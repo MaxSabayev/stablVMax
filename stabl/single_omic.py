@@ -269,6 +269,7 @@ def single_omic_simple(
 
         table_of_scores.append(cell_value)
 
+    table_of_scores = pd.DataFrame(data=table_of_scores, index=scores_columns)
 
     return predictions,formatted_features,table_of_scores
 

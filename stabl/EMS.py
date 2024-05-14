@@ -105,7 +105,7 @@ def generateModel(paramSet: dict):
                                         class_weight='balanced',max_iter=int(1e6),random_state=42)
         if "stabl" in paramSet["model"]:
             lambdaGrid = [ {b:c for b,c in zip(paramSet["varNames"],a)} for a in itertools.product(*[
-                            [paramSet[v]] if ii ==0 else paramSet[v] for ii,v in enumerate(paramSet["varNames"])] )]
+                            [paramSet[v]] if ii ==0 else [paramSet[v]] for ii,v in enumerate(paramSet["varNames"])] )]
         # case "sgl":
         #     submodel = LogisticSGL(max_iter=int(1e3), l1_ratio=0.5)
     else:
