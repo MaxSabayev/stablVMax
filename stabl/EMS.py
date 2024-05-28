@@ -73,6 +73,7 @@ def unroll_parameters(params: dict) -> list:
     experiments.extend([{key: value for key, value in zip(stablParams.keys(), combo)} for combo in itertools.product(*stablParams.values())])
     for exp in experiments:
         exp["varType"] = params["general"]["varType"]
+        exp["innerCVvals"] = params["general"]["innerCVvals"]
         for modelVariableName in params[exp["model"]].keys():
             exp[modelVariableName] = spacerize(params[exp["model"]][modelVariableName])
         exp["varNames"] = list(params[exp["model"]].keys())
@@ -103,8 +104,7 @@ def generateModel(paramSet: dict):
         submodel = LogisticRegression(penalty='elasticnet',solver='saga',
                                         class_weight='balanced',max_iter=int(1e6),random_state=42)
         if "stabl" in paramSet["model"]:
-            lambdaGrid = [ {b:c for b,c in zip(paramSet["varNames"],a)} for a in itertools.product(*[
-                            [paramSet[v]] if ii ==0 else paramSet[v] for ii,v in enumerate(paramSet["varNames"])] )]
+            lambdaGrid = [{b:paramSet[b] for b in paramSet["varNames"]}]
         # case "sgl":
         #     submodel = LogisticSGL(max_iter=int(1e3), l1_ratio=0.5)
     else:
@@ -115,7 +115,7 @@ def generateModel(paramSet: dict):
         model = Stabl(
                     submodel,
                     n_bootstraps=paramSet["n_bootstraps"],
-                    artificial_type=paramSet["artificalTypes"],
+                    artificial_type=paramSet["artificialTypes"],
                     artificial_proportion=paramSet["artificialProportions"],
                     replace=paramSet["replace"],
                     fdr_threshold_range=np.arange(*paramSet["fdrThreshParams"]),
@@ -125,7 +125,7 @@ def generateModel(paramSet: dict):
                     verbose=1
                 )
     else:
-        chosen_inner_cv = RepeatedStratifiedKFold(*paramSet["general"]["innerCVvals"], random_state=42)
+        chosen_inner_cv = RepeatedStratifiedKFold(n_splits=paramSet["innerCVvals"][0],n_repeats=paramSet["innerCVvals"][1], random_state=42)
         model = GridSearchCV(submodel, param_grid=lambdaGrid, 
                              scoring="roc_auc", cv=chosen_inner_cv, n_jobs=-1)
     
@@ -140,7 +140,7 @@ def do_experiment(instance: callable, parameters: list, client: Client): #db: Da
     logger.info(f'Number of Instances to calculate: {instance_count}')
     # Start the computation.
     tick = time.perf_counter()
-    futures = client.map(lambda p: instance(**p), parameters, batch_size=BATCH_SIZE)
+    futures = client.map(lambda p: instance(p), parameters, batch_size=BATCH_SIZE)
     for batch in as_completed(futures, with_results=True).batches():
         for future, result in batch:
             i += 1
@@ -159,9 +159,9 @@ def do_experiment(instance: callable, parameters: list, client: Client): #db: Da
         logger.info(f"Count: {instance_count}, Seconds/Instance: {(total_time / instance_count):0.4f}")
 
 
-def do_on_cluster(parameterList: dict, function: callable, client: Client):
+def do_on_cluster(parameterPath: str, function: callable, client: Client):
     logger.info(f'{client}')
-
+    parameterList = read_json(parameterPath)
     # Save the experiment domain.
     record_experiment(parameterList)
 

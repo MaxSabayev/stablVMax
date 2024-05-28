@@ -22,20 +22,6 @@ paramFilePath = "./params.json"
 savePath = "./Results"
 os.makedirs(savePath, exist_ok=True)
 
-def run(idx):
-    
-    
-    preds, selectedFeats = single_omic_simple(
-        data,
-        y,
-        outerSplitter,
-        model,
-        modelName,
-        preprocessing,
-        taskType,
-    )
-    preds.to_csv(Path(savePath,"preds-"+title+".csv"))
-    selectedFeats.to_csv(Path(savePath,"selectedFeats-"+title+".csv"))
 
 def experiment(paramSet: dict):
     preprocessing,model = generateModel(paramSet)
@@ -48,6 +34,8 @@ def experiment(paramSet: dict):
         preprocessing,
         taskType,
     )
+    # preds.to_csv(Path(savePath,"preds-"+title+".csv"))
+    # selectedFeats.to_csv(Path(savePath,"selectedFeats-"+title+".csv"))
 
 
 def do_cluster_experiment(paramPath):
