@@ -1,5 +1,5 @@
 {
-    "table_name": "Generic_Experiment_Template",
+    "Experiment_Name": "Generic_Experiment_Template",
     "general" :{ 
         "varType" : "thresh",
         "innerCVvals" : [5,5],

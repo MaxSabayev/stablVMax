@@ -41,8 +41,7 @@ def single_omic_simple(
         estimator_name,
         preprocessing,
         task_type,
-        outer_groups=None,
-        sgl_corr =90
+        outer_groups=None
 ):
     """
     Performs a cross validation on the data_dict using the models and saves the results in save_path.
@@ -231,18 +230,18 @@ def single_omic_simple(
         if metric == "ROC AUC":
             model_roc = roc_auc_score(y, predictions)
             model_roc_CI = compute_CI(y, predictions, scoring="roc_auc")
-            cell_value = f"{model_roc:.3f} [{model_roc_CI[0]:.3f}, {model_roc_CI[1]:.3f}]"
+            cell_value = [f"{model_roc:.3f}",f"{model_roc_CI[0]:.3f}", f"{model_roc_CI[1]:.3f}"]
 
         elif metric == "Average Precision":
             model_ap = average_precision_score(y, predictions)
             model_ap_CI = compute_CI(y, predictions, scoring="average_precision")
-            cell_value = f"{model_ap:.3f} [{model_ap_CI[0]:.3f}, {model_ap_CI[1]:.3f}]"
+            cell_value = [f"{model_ap:.3f}", f"{model_ap_CI[0]:.3f}", f"{model_ap_CI[1]:.3f}"]
 
         elif metric == "N features":
             sel_features = formatted_features["Fold nb of features"]
             median_features = np.median(sel_features)
             iqr_features = np.quantile(sel_features, [.25, .75])
-            cell_value = f"{median_features:.3f} [{iqr_features[0]:.3f}, {iqr_features[1]:.3f}]"
+            cell_value = [f"{median_features:.3f}", f"{iqr_features[0]:.3f}", f"{iqr_features[1]:.3f}"]
 
         elif metric == "CVS":
             jaccard_mat = jaccard_matrix(formatted_features["Fold selected features"], remove_diag=False)
@@ -250,26 +249,26 @@ def single_omic_simple(
                 jaccard_mat, k=1)]
             jaccard_median = np.median(jaccard_val)
             jaccard_iqr = np.quantile(jaccard_val, [.25, .75])
-            cell_value = f"{jaccard_median:.3f} [{jaccard_iqr[0]:.3f}, {jaccard_iqr[1]:.3f}]"
+            cell_value = [f"{jaccard_median:.3f}",f"{jaccard_iqr[0]:.3f}", f"{jaccard_iqr[1]:.3f}"]
 
         elif metric == "R2":
             model_r2 = r2_score(y, predictions)
             model_r2_CI = compute_CI(y, predictions, scoring="r2")
-            cell_value = f"{model_r2:.3f} [{model_r2_CI[0]:.3f}, {model_r2_CI[1]:.3f}]"
+            cell_value = [f"{model_r2:.3f}",f"{model_r2_CI[0]:.3f}", f"{model_r2_CI[1]:.3f}"]
 
         elif metric == "RMSE":
             model_rmse = np.sqrt(mean_squared_error(y, predictions))
             model_rmse_CI = compute_CI(y, predictions, scoring="rmse")
-            cell_value = f"{model_rmse:.3f} [{model_rmse_CI[0]:.3f}, {model_rmse_CI[1]:.3f}]"
+            cell_value = [f"{model_rmse:.3f}", f"{model_rmse_CI[0]:.3f}", f"{model_rmse_CI[1]:.3f}"]
 
         elif metric == "MAE":
             model_mae = mean_absolute_error(y, predictions)
             model_mae_CI = compute_CI(y, predictions, scoring="mae")
-            cell_value = f"{model_mae:.3f} [{model_mae_CI[0]:.3f}, {model_mae_CI[1]:.3f}]"
+            cell_value = [f"{model_mae:.3f}", f"{model_mae_CI[0]:.3f}", f"{model_mae_CI[1]:.3f}"]
 
-        table_of_scores.append(cell_value)
+        table_of_scores.extend(cell_value)
 
-    table_of_scores = pd.DataFrame(data=table_of_scores, index=scores_columns)
+    table_of_scores = pd.DataFrame(data=table_of_scores, index=[ a + b for a in scores_columns for b in ["", " LB", " UB"]])
 
     return predictions,formatted_features,table_of_scores
 

@@ -1,4 +1,6 @@
-mkdir logs
-var=($(python3 -c 'from stabl.EMS import parse_params; parse_params("./paramsNew.json")'))
-cat ~/arrayDefaultLow.sh | sed "s/rep/${var[1]}/" | sbatch 
-cat ~/arrayDefaultHigh.sh | sed "s/rep/${var[2]}/" | sbatch
+python3 -c 'from stabl.sherlock import parse_params; parse_params("./params.json")'
+sbatch -W ./temp/arrayLow.sh &
+sbatch -W ./temp/arrayHigh.sh &
+wait
+python3 ./sendOut.py 1
+

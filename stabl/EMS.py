@@ -80,16 +80,16 @@ def unroll_parameters(params: dict) -> list:
 
     return experiments
 
-def parse_params(paramsFile: str)->tuple:
-    params = read_json(paramsFile)
-    paramList = unroll_parameters(params)
-    os.makedirs("./tempProfiles/", exist_ok=True)
-    highImpactIdx = np.argwhere(["en" in p["model"] for p in paramList]).flatten().astype(int)
-    lowImpactIdx = np.array(list(set(range(len(paramList))).difference(set(highImpactIdx))))
-    np.savetxt("./tempProfiles/highImpactIdx.txt",highImpactIdx,fmt="%i")
-    np.savetxt("./tempProfiles/lowImpactIdx.txt",lowImpactIdx,fmt="%i")
-    print(len(lowImpactIdx))
-    print(len(highImpactIdx))
+# def parse_params(paramsFile: str)->tuple:
+#     params = read_json(paramsFile)
+#     paramList = unroll_parameters(params)
+#     os.makedirs("./tempProfiles/", exist_ok=True)
+#     highImpactIdx = np.argwhere(["en" in p["model"] for p in paramList]).flatten().astype(int)
+#     lowImpactIdx = np.array(list(set(range(len(paramList))).difference(set(highImpactIdx))))
+#     np.savetxt("./tempProfiles/highImpactIdx.txt",highImpactIdx,fmt="%i")
+#     np.savetxt("./tempProfiles/lowImpactIdx.txt",lowImpactIdx,fmt="%i")
+#     print(len(lowImpactIdx))
+#     print(len(highImpactIdx))
     
         
 
