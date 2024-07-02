@@ -74,10 +74,30 @@ def unroll_parameters(params: dict) -> list:
     for exp in experiments:
         exp["varType"] = params["general"]["varType"]
         exp["innerCVvals"] = params["general"]["innerCVvals"]
+        exp["seed"] = params["general"]["seed"]
         for modelVariableName in params[exp["model"]].keys():
-            exp[modelVariableName] = spacerize(params[exp["model"]][modelVariableName])
-        exp["varNames"] = list(params[exp["model"]].keys())
-
+            if modelVariableName == "hyperparameters":
+                for modelHyperParamName in params[exp["model"]]["hyperparameters"].keys():
+                    exp[modelHyperParamName] = spacerize(params[exp["model"]]["hyperparameters"][modelHyperParamName])
+            else:
+                exp[modelVariableName] = params[exp["model"]][modelVariableName]
+        exp["varNames"] = list(params[exp["model"]]["hyperparameters"].keys())
+    
+    num = params["datasets"]["number"]
+    if num > 1:
+        experimentsFull = []
+        for exp in experiments:
+            for i in range(num):
+                newExp = copy.deepcopy(exp)
+                newExp["dataset"] = params["datasets"]["names"][i]
+                experimentsFull.append(newExp)
+            newExp = copy.deepcopy(exp)
+            newExp["dataset"] = "EarlyFusion"
+            experimentsFull.append(newExp)
+        return experimentsFull
+    
+    for exp in experiments:
+        exp["dataset"] = params["datasets"]["names"][0]
     return experiments
 
 # def parse_params(paramsFile: str)->tuple:
@@ -108,15 +128,17 @@ def generateModel(paramSet: dict):
                                ("std", StandardScaler())])
     preprocessing = Pipeline(steps=preprocessingList)
     lambdaGrid = None
+    maxIter = int(paramSet["max_iter"])
+    seed = int(paramSet["seed"])
     if paramSet["model"] == "stabl_lasso" or  paramSet["model"] == "lasso":
         submodel = LogisticRegression(penalty="l1", class_weight="balanced", 
-                                            max_iter=int(1e6), solver="liblinear", random_state=42)
+                                            max_iter=maxIter, solver="liblinear", random_state=seed)
     elif paramSet["model"] == "stabl_alasso" or paramSet["model"] == "alasso":
         submodel = ALogitLasso(penalty="l1", solver="liblinear", 
-                                    max_iter=int(1e6), class_weight='balanced', random_state=42)
+                                    max_iter=maxIter, class_weight='balanced', random_state=seed)
     elif paramSet["model"] == "stabl_en" or paramSet["model"] == "en":
         submodel = LogisticRegression(penalty='elasticnet',solver='saga',
-                                        class_weight='balanced',max_iter=int(1e6),random_state=42)
+                                        class_weight='balanced',max_iter=maxIter,random_state=seed)
         if "stabl" in paramSet["model"]:
             lambdaGrid = [{b:paramSet[b] for b in paramSet["varNames"]}]
         # case "sgl":
@@ -134,18 +156,18 @@ def generateModel(paramSet: dict):
                     replace=paramSet["replace"],
                     fdr_threshold_range=np.arange(*paramSet["fdrThreshParams"]),
                     sample_fraction=paramSet["sampleFractions"],
-                    random_state=42,
+                    random_state=seed+1,
                     lambda_grid=lambdaGrid,
                     verbose=1
                 )
     else:
-        chosen_inner_cv = RepeatedStratifiedKFold(n_splits=paramSet["innerCVvals"][0],n_repeats=paramSet["innerCVvals"][1], random_state=42)
+        chosen_inner_cv = RepeatedStratifiedKFold(n_splits=paramSet["innerCVvals"][0],n_repeats=paramSet["innerCVvals"][1], random_state=seed+2)
         model = GridSearchCV(submodel, param_grid=lambdaGrid, 
                              scoring="roc_auc", cv=chosen_inner_cv, n_jobs=-1)
     
     return preprocessing,model
 
-            
+
 
     
 # def do_experiment(instance: callable, parameters: list, client: Client): #db: Databases):

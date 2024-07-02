@@ -7,6 +7,7 @@ from sklearn.pipeline import Pipeline
 from sklearn.linear_model import LogisticRegression, LinearRegression
 from sklearn.impute import SimpleImputer
 from sklearn import clone
+from scipy.optimize import nnls
 import numpy as np
 import pandas as pd
 from sklearn.exceptions import ConvergenceWarning
@@ -15,22 +16,9 @@ from sklearn.metrics import roc_auc_score, average_precision_score, r2_score, me
 from .utils import compute_CI
 from .metrics import jaccard_matrix
 
-logit = LogisticRegression(penalty=None, class_weight="balanced", max_iter=int(1e6), random_state=42)
+logit = LogisticRegression(penalty=None, class_weight="balanced", max_iter=int(1e6))
 linreg = LinearRegression()
 
-def _make_groups(X, percentile):
-    n = X.shape[1]
-    u = UnionFind(elements=range(n))
-    corr_mat = pd.DataFrame(X).corr().values
-    corr_val = corr_mat[np.triu_indices_from(corr_mat, k=1)]
-    threshold = np.percentile(corr_val, percentile)
-    for i in np.arange(n):
-        for j in np.arange(n):
-            if abs(corr_mat[i, j]) > threshold:
-                u.union(i, j)
-    res = list(map(list, u.components()))
-    res = list(map(np.array, res))
-    return res
 
 @ignore_warnings(category=ConvergenceWarning)
 def single_omic_simple(
@@ -89,6 +77,7 @@ def single_omic_simple(
 
 
     predictions = pd.DataFrame(data=None, index=y.index)
+    insamplePredictions = []
     selected_features= []
     stabl_features= pd.DataFrame(data=None, columns=["Threshold", "min FDP+"])
     best_params = []
@@ -140,10 +129,14 @@ def single_omic_simple(
 
         if estimator_name in ["lasso", "alasso","en"]:
             model = clone(estimator)
+            model.fit(X_tmp_std, y_tmp, groups=groups)
             if task_type == "binary":
-                pred = model.fit(X_tmp_std, y_tmp, groups=groups).predict_proba(X_test_tmp_std)[:, 1]
+                pred = model.predict_proba(X_test_tmp_std)[:, 1]
+                insamplePreds = model.predict_proba(X_tmp_std)[:, 1]
             else:
-                pred = model.fit(X_tmp_std, y_tmp, groups=groups).predict(X_test_tmp_std)
+                pred = model.predict(X_test_tmp_std)
+                insamplePreds = model.predict(X_tmp_std)
+            insamplePredictions.append(insamplePreds)
             tmp_sel_features = list(X_tmp_std.columns[np.where(model.best_estimator_.coef_.flatten())])
             fold_selected_features.extend(tmp_sel_features)
             predictions.loc[test_idx_tmp, f"Fold #{k}"] = pred
@@ -217,6 +210,139 @@ def single_omic_simple(
             index=[f"Fold {i}" for i in range(outer_splitter.get_n_splits(X=data,groups=outer_groups))]
         )
 
+
+    return predictions,formatted_features,selected_features,insamplePredictions
+
+        
+def late_fusion_combination_normal(
+        data,
+        y,
+        oosPredictions,
+        isPredictions,
+        outer_splitter,
+        outer_groups=None
+    ):
+    """
+    data : pd.DataFrame
+        pandas DataFrame containing the original data
+    oosPredictions : list of pd.Series
+        for each omic, the pandas DataFrame containing the oos predictions
+    isPredictions : list of pd.DataFrames
+        for each omic, the in-sample predictions over each of the folds of the crosvalidation
+
+    """
+    predictions = pd.DataFrame(data=None, index=y.index)
+    k = 1
+    for train, test in (tbar := tqdm(
+            outer_splitter.split(data, y, groups=outer_groups),
+            total=outer_splitter.get_n_splits(X=data, y=y, groups=outer_groups),
+            file=sys.stdout
+    )):
+        train_idx, test_idx = y.iloc[train].index, y.iloc[test].index
+
+        foldData = pd.concat([pred.iloc[k-1,:] for pred in isPredictions], axis=1).to_numpy()
+        foldY = pd.concat([pred.loc[test_idx, f'Fold #{k}'] for pred in oosPredictions], axis=1).to_numpy()
+
+        beta,_ = nnls(foldData, y.loc[train_idx].to_numpy())
+
+        prediction = foldY @ beta
+
+        predictions.loc[test_idx, f"Fold #{k}"] = prediction
+
+        k += 1
+    
+    return predictions
+
+def late_fusion_combination_stabl(
+        data,
+        y,
+        selected_features,
+        outer_splitter,
+        task_type,
+        outer_groups=None
+    ):
+    """
+    data : pd.DataFrame
+        pandas DataFrame containing the original data
+    oosPredictions : list of pd.Series
+        for each omic, the pandas DataFrame containing the oos predictions
+    isPredictions : list of pd.DataFrames
+        for each omic, the in-sample predictions over each of the folds of the crosvalidation
+
+    """
+    predictions = pd.DataFrame(data=None, index=y.index)
+    k = 1
+    for train, test in (tbar := tqdm(
+            outer_splitter.split(data, y, groups=outer_groups),
+            total=outer_splitter.get_n_splits(X=data, y=y, groups=outer_groups),
+            file=sys.stdout
+    )):
+        train_idx, test_idx = y.iloc[train].index, y.iloc[test].index
+
+        fold_selected_features = []
+        for omic in selected_features:
+            fold_selected_features.extend(omic[k-1])
+
+        X_train = data.loc[train_idx, fold_selected_features]
+        X_test = data.loc[test_idx, fold_selected_features]
+        y_train = y.loc[train_idx]
+
+        if len(fold_selected_features) > 0:
+            # Standardization
+            std_pipe = Pipeline(
+                steps=[
+                    ('imputer', SimpleImputer(strategy="median")),
+                    ('std', StandardScaler())
+                ]
+            )
+
+            X_train = pd.DataFrame(
+                data=std_pipe.fit_transform(X_train),
+                index=X_train.index,
+                columns=X_train.columns
+            )
+            X_test = pd.DataFrame(
+                data=std_pipe.transform(X_test),
+                index=X_test.index,
+                columns=X_test.columns
+            )
+
+            # __Final Models__
+            if task_type == "binary":
+                pred = clone(logit).fit(X_train, y_train).predict_proba(X_test)[:, 1].flatten()
+
+            elif task_type == "regression":
+                pred = clone(linreg).fit(X_train, y_train).predict(X_test)
+
+            else:
+                raise ValueError("task_type not recognized.")
+
+            predictions.loc[test_idx, f"Fold #{k}"] = pred
+
+        else:
+            if task_type == "binary":
+                predictions.loc[test_idx, f'Fold #{k}'] = [0.5] * len(test_idx)
+
+            elif task_type == "regression":
+                predictions.loc[test_idx, f'Fold #{k}'] = [np.mean(y_train)] * len(test_idx)
+
+            else:
+                raise ValueError("task_type not recognized.")
+        
+
+        k += 1
+    
+    return predictions
+
+
+
+
+def simpleScores(
+        predictions,
+        y,
+        formatted_features,
+        task_type,
+):
     predictions = predictions.median(axis=1)
 
     if task_type == "binary":
@@ -269,7 +395,4 @@ def single_omic_simple(
         table_of_scores.extend(cell_value)
 
     table_of_scores = pd.DataFrame(data=table_of_scores, index=[ a + b for a in scores_columns for b in ["", " LB", " UB"]])
-
-    return predictions,formatted_features,table_of_scores
-
-        
+    return table_of_scores

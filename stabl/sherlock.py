@@ -5,7 +5,7 @@ import re
 import argparse
 
 defaultScript = """#!/usr/bin/bash
-#SBATCH --job-name=NAME
+#SBATCH --job-name=NAME_V
 #SBATCH --error=./logs/NAME_V_%a.err
 #SBATCH --output=./logs/NAME_V_%a.out
 #SBATCH --array=0-REP

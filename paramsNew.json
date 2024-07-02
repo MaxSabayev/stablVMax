@@ -1,5 +1,9 @@
 {
     "Experiment_Name": "Generic_Experiment_Template",
+    "datasets" : {
+        "number" : 2,
+        "names" : ["dataset1","dataset2"]
+    },
     "general" :{ 
         "varType" : "thresh",
         "innerCVvals" : [5,5],
@@ -10,7 +14,8 @@
             "stabl_lasso" : true,
             "stabl_alasso" : true,
             "stabl_en" : true
-        }
+        },
+        "seed" : 42
     },
     "preprocessing" : {
         "varValues": [0,0.01,0.1],
@@ -25,23 +30,29 @@
         "fdrThreshParams": [[0.1,1.0,0.01]]
     },
     "lasso" :  {
-        "C" : {"type" : "log", "val" : [-2,2,30]}
+        "hyperparameters" : {"C" : {"type" : "log", "val" : [-2,2,30]}},
+        "max_iter" : 1000000
     },
     "alasso" : {
-        "C" : {"type" : "log", "val" : [-2,2,30]}
+        "hyperparameters" : {"C" : {"type" : "log", "val" : [-2,2,30]}},
+        "max_iter" : 1000000
     },
     "en": { 
-        "C" : {"type" : "log", "val" : [-2,1,10]},
-        "l1_ratio": {"type" : "lin", "val" : [0.1,0.9,5]}
+        "hyperparameters" : {"C" : {"type" : "log", "val" : [-2,1,10]},
+                             "l1_ratio": {"type" : "lin", "val" : [0.1,0.9,5]}},
+        "max_iter" : 10000
     },
     "stabl_lasso": {
-        "C" : {"type" : "log", "val" : [-2,1,10]}
+        "hyperparameters" : {"C" : {"type" : "log", "val" : [-2,1,10]}},
+        "max_iter" : 1000000
     },
     "stabl_alasso": {
-        "C" : {"type" : "log", "val" : [-2,1,10]}
+        "hyperparameters" : {"C" : {"type" : "log", "val" : [-2,1,10]}},
+        "max_iter" : 1000000    
     },
     "stabl_en": {
-        "C" : {"type" : "log", "val" : [-2,1,10]},
-        "l1_ratio": {"type" : "lin", "val" : [0.1,0.9,5]}
+        "hyperparameters" : {"C" : {"type" : "log", "val" : [-2,1,10]},
+                             "l1_ratio": {"type" : "lin", "val" : [0.1,0.9,5]}},
+        "max_iter" : 10000
     }
 }
