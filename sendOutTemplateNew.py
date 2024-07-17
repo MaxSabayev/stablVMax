@@ -17,7 +17,7 @@ datasets = {}
 
 datasets["Proteome"] = pd.read_csv("../data/WayneProteome.csv",index_col=0)
 datasets["CyTOF"] = pd.read_csv("../data/WayneCyTOF.csv",index_col=0)
-y = pd.read_csv("../data/labelLong.csv",index_col=0).loc[datasets["CyTOF"].index].PE
+y = pd.read_csv("../data/labelLong.csv",index_col=0)
 groups = pd.Series(data = [int(e.split("_")[0]) for e in datasets["CyTOF"].index], index = datasets["CyTOF"].index)
 outerSplitter = LeaveOneGroupOut()
 taskType = 'binary'
@@ -35,6 +35,7 @@ os.makedirs(savePath, exist_ok=True)
 
 def experiment(paramSet: dict,idx: int):
     data = datasets[paramSet["dataset"]]
+    y = y.loc[data.index].PE
     preprocessing,model = generateModel(paramSet)
     preds, formattedFeats, selectedFeats,insamplePredictions = single_omic_simple(
         data,
@@ -53,8 +54,8 @@ def experiment(paramSet: dict,idx: int):
     preds.to_csv(Path(savePath,name,"cvPreds.csv"))
     formattedFeats.to_csv(Path(savePath,name,"selectedFeats.csv"))
     scores = simpleScores(preds,y,formattedFeats,taskType)
-    selectedFeats.to_csv(Path(savePath,name,"noformatFeats.csv"))
-    insamplePredictions.to_csv(Path(savePath,name,"insamplePreds.csv"))
+    pd.DataFrame(selectedFeats).to_csv(Path(savePath,name,"noformatFeats.csv"))
+    pd.DataFrame(insamplePredictions).to_csv(Path(savePath,name,"insamplePreds.csv"))
     scores.to_csv(Path(savePath,name,"cvScores.csv"))
     if "stabl" in paramSet["model"]:
         data_std = pd.DataFrame(

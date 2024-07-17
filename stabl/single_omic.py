@@ -240,11 +240,14 @@ def late_fusion_combination_normal(
     )):
         train_idx, test_idx = y.iloc[train].index, y.iloc[test].index
 
-        foldData = pd.concat([pred.iloc[k-1,:] for pred in isPredictions], axis=1).to_numpy()
-        foldY = pd.concat([pred.loc[test_idx, f'Fold #{k}'] for pred in oosPredictions], axis=1).to_numpy()
+        foldData = pd.concat([pd.Series(pred[k-1]) for pred in isPredictions], axis=1).fillna(0.5).to_numpy()
+        # foldData = np.nan_to_num(np.stack([ np.array(pred[k-1]) for pred in isPredictions]))
+        foldY = pd.concat([pred.loc[test_idx, f'Fold #{k}'] for pred in oosPredictions], axis=1).fillna(0.5).to_numpy()
 
-        beta,_ = nnls(foldData, y.loc[train_idx].to_numpy())
-
+        yFit = y.loc[train_idx].to_numpy().flatten()
+        # print(foldData.shape, foldY.shape, yFit.shape, np.sum(np.isnan(foldData)), np.sum(np.isnan(foldY)),np.sum(np.isnan(yFit)))
+        beta,_ = nnls(foldData, yFit)
+        print(beta)
         prediction = foldY @ beta
 
         predictions.loc[test_idx, f"Fold #{k}"] = prediction
@@ -264,13 +267,11 @@ def late_fusion_combination_stabl(
     """
     data : pd.DataFrame
         pandas DataFrame containing the original data
-    oosPredictions : list of pd.Series
-        for each omic, the pandas DataFrame containing the oos predictions
-    isPredictions : list of pd.DataFrames
-        for each omic, the in-sample predictions over each of the folds of the crosvalidation
-
+    selected_features : list of lists
+        for each omic, the list of selected features over each of the folds of the crosvalidation
     """
     predictions = pd.DataFrame(data=None, index=y.index)
+    total_features = []
     k = 1
     for train, test in (tbar := tqdm(
             outer_splitter.split(data, y, groups=outer_groups),
@@ -282,6 +283,7 @@ def late_fusion_combination_stabl(
         fold_selected_features = []
         for omic in selected_features:
             fold_selected_features.extend(omic[k-1])
+        total_features.append(fold_selected_features)
 
         X_train = data.loc[train_idx, fold_selected_features]
         X_test = data.loc[test_idx, fold_selected_features]
@@ -310,6 +312,8 @@ def late_fusion_combination_stabl(
             # __Final Models__
             if task_type == "binary":
                 pred = clone(logit).fit(X_train, y_train).predict_proba(X_test)[:, 1].flatten()
+                print(pred, y.loc[test_idx].to_numpy().flatten())
+
 
             elif task_type == "regression":
                 pred = clone(linreg).fit(X_train, y_train).predict(X_test)
@@ -331,8 +335,17 @@ def late_fusion_combination_stabl(
         
 
         k += 1
+
+
+    formatted_features = pd.DataFrame(
+            data={
+                "Fold selected features": total_features,
+                "Fold nb of features": [len(el) for el in total_features]
+            },
+            index=[f"Fold {i}" for i in range(outer_splitter.get_n_splits(X=data,groups=outer_groups))]
+        )
     
-    return predictions
+    return predictions,formatted_features
 
 
 
@@ -341,7 +354,7 @@ def simpleScores(
         predictions,
         y,
         formatted_features,
-        task_type,
+        task_type
 ):
     predictions = predictions.median(axis=1)
 

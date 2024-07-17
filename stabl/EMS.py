@@ -61,7 +61,7 @@ def spacerize(spaceDict: dict):
     elif spaceDict["type"] == "lin":
         return np.linspace(*spaceDict["val"])
 
-def unroll_parameters(params: dict) -> list:
+def unroll_parameters(params: dict,ef=False) -> list:
     models = [k for k in params["general"]["models"].keys() if params["general"]["models"][k]]
     stablModels = [m for m in models if "stabl" in m]
     nonStablModels = [m for m in models if "stabl" not in m]
@@ -91,9 +91,10 @@ def unroll_parameters(params: dict) -> list:
                 newExp = copy.deepcopy(exp)
                 newExp["dataset"] = params["datasets"]["names"][i]
                 experimentsFull.append(newExp)
-            newExp = copy.deepcopy(exp)
-            newExp["dataset"] = "EarlyFusion"
-            experimentsFull.append(newExp)
+            if ef:
+                newExp = copy.deepcopy(exp)
+                newExp["dataset"] = "EarlyFusion"
+                experimentsFull.append(newExp)
         return experimentsFull
     
     for exp in experiments:
