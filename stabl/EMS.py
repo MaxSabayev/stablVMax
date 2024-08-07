@@ -162,12 +162,12 @@ def generateModel(paramSet: dict):
                     replace=paramSet["replace"],
                     fdr_threshold_range=np.arange(*paramSet["fdrThreshParams"]),
                     sample_fraction=paramSet["sampleFractions"],
-                    random_state=seed+1,
+                    random_state=seed,
                     lambda_grid=lambdaGrid,
                     verbose=1
                 )
     else:
-        chosen_inner_cv = RepeatedStratifiedKFold(n_splits=paramSet["innerCVvals"][0],n_repeats=paramSet["innerCVvals"][1], random_state=seed+2)
+        chosen_inner_cv = RepeatedStratifiedKFold(n_splits=paramSet["innerCVvals"][0],n_repeats=paramSet["innerCVvals"][1], random_state=seed)
         model = GridSearchCV(submodel, param_grid=lambdaGrid, 
                              scoring="roc_auc", cv=chosen_inner_cv, n_jobs=-1)
     
