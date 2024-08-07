@@ -75,6 +75,8 @@ def unroll_parameters(params: dict,ef=False) -> list:
         exp["varType"] = params["general"]["varType"]
         exp["innerCVvals"] = params["general"]["innerCVvals"]
         exp["seed"] = params["general"]["seed"]
+        if exp["seed"] == False:
+            exp["seed"] = None
         for modelVariableName in params[exp["model"]].keys():
             if modelVariableName == "hyperparameters":
                 for modelHyperParamName in params[exp["model"]]["hyperparameters"].keys():
@@ -130,7 +132,10 @@ def generateModel(paramSet: dict):
     preprocessing = Pipeline(steps=preprocessingList)
     lambdaGrid = None
     maxIter = int(paramSet["max_iter"])
-    seed = int(paramSet["seed"])
+    if paramSet["seed"] is not None:
+        seed = int(paramSet["seed"])
+    else:
+        seed = None
     if paramSet["model"] == "stabl_lasso" or  paramSet["model"] == "lasso":
         submodel = LogisticRegression(penalty="l1", class_weight="balanced", 
                                             max_iter=maxIter, solver="liblinear", random_state=seed)

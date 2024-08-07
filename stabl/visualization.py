@@ -431,6 +431,7 @@ def scatterplot_features(
             plt.close()
 
 
+
 def boxplot_binary_predictions(
         y_true,
         y_preds,
@@ -501,6 +502,7 @@ def boxplot_binary_predictions(
     if classes is not None:
         ax.set_yticklabels(labels=classes)
 
+    utest = mannwhitneyu(y_preds[y_true == 0], y_preds[y_true == 1])
     roc_auc = roc_auc_score(y_true, y_preds)
     auc_ci_lo, auc_ci_up = compute_CI(y_true, y_preds, scoring="roc_auc")
     precision, recall, _ = precision_recall_curve(y_true, y_preds)
@@ -508,6 +510,7 @@ def boxplot_binary_predictions(
     pr_ci_lo, pr_ci_up = compute_CI(y_true, y_preds, scoring="prc_auc")
 
     plt.title(
+        fr"$\bf{{Mannwhitney}}$ pvalue={utest.pvalue:.2e}" + '\n'
         fr"$\bf{{AUROC}}$={roc_auc:.2f} [{auc_ci_lo:.2f}, {auc_ci_up:.2f}]" + '\n'
         fr"$\bf{{AUPRC}}$={pr_auc:.2f} [{pr_ci_lo:.2f}, {pr_ci_up:.2f}]",
         fontsize=10
