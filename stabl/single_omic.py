@@ -76,7 +76,7 @@ def single_omic_simple(
     """
 
 
-    predictions = pd.DataFrame(data=None, index=y.index)
+    predictions = pd.DataFrame(data=None, index=y.index, columns=[f"Fold #{i}" for i in range(outer_splitter.get_n_splits(X=data, y=y, groups=outer_groups))])
     insamplePredictions = []
     selected_features= []
     stabl_features= pd.DataFrame(data=None, columns=["Threshold", "min FDP+"])
