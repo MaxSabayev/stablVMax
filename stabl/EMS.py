@@ -92,7 +92,7 @@ def unroll_parameters(params: dict) -> list:
                 newExp["dataset"] = params["datasets"][i]
                 newExp["cvSeed"] = cvSeed
                 experimentsFull.append(newExp)
-        return experimentsFull
+        experiments = experimentsFull
     
     h = 0
     l = 0
