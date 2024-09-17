@@ -40,6 +40,9 @@ def timestamp() -> int:
 
 def write_json(d: dict, fn: str):
     with open(fn, 'w') as json_file:
+        for key in d.keys():
+            if isinstance(d[key], np.ndarray):
+                d[key] = d[key].tolist()
         json.dump(d, json_file, indent=4)
 
 
