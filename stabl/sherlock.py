@@ -56,8 +56,8 @@ def parse_params(paramsFile: str)->None:
             sc = re.sub("V","h",sc)
             file.write(sc)
 
-    print(lowCount  != 0)
-    print(highCount != 0)
+    print(int(lowCount  != 0))
+    print(int(highCount != 0))
 
 # if __name__ == "__main__":
 #     parser = argparse.ArgumentParser()
