@@ -50,7 +50,7 @@ def jaccard_matrix(list_of_lists, remove_diag=True):
 
     for i in range(N):
         for j in range(N):
-            jaccard_mat[i, j] = jaccard_similarity(list_of_lists[i], list_of_lists[j])
+            jaccard_mat[i, j] = jaccard_similarity(list_of_lists.iloc[i], list_of_lists.iloc[j])
 
     if remove_diag:
         jaccard_mat = jaccard_mat[~np.eye(jaccard_mat.shape[0], dtype=bool)].reshape(

@@ -15,10 +15,18 @@ from sklearn.utils._testing import ignore_warnings
 from sklearn.metrics import roc_auc_score, average_precision_score, r2_score, mean_squared_error, mean_absolute_error
 from .utils import compute_CI
 from .metrics import jaccard_matrix
+from pathlib import Path
 
 logit = LogisticRegression(penalty=None, class_weight="balanced", max_iter=int(1e6))
 linreg = LinearRegression()
+std_pipe = Pipeline(
+    steps=[
+        ('imputer', SimpleImputer(strategy="median")),
+        ('std', StandardScaler())
+    ]
+)
 
+fromPreprocessing = lambda data,prepro: pd.DataFrame(data=prepro.transform(data),index=data.index,columns=prepro.get_feature_names_out())
 
 @ignore_warnings(category=ConvergenceWarning)
 def single_omic_simple(
@@ -29,6 +37,7 @@ def single_omic_simple(
         estimator_name,
         preprocessing,
         task_type,
+        ef = False,
         outer_groups=None
 ):
     """
@@ -66,8 +75,8 @@ def single_omic_simple(
     outer_groups: pd.Series, default=None
         If used, should be the same size as y and should indicate the groups of the samples.
 
-    sgl_corr_percentile: float, default=90
-        Correlation threshold to use for SGL or STABL SGL.
+    ef: bool, default=False
+        If True, doesnt return the insample predictions for non-stabl models.
 
     Returns
     -------
@@ -75,12 +84,17 @@ def single_omic_simple(
         DataFrame containing the predictions of the model for each sample in Cross-Validation.
     """
 
+    stablFlag = "stabl" in estimator_name
+    foldIdx = [f"Fold_{i}" for i in range(outer_splitter.get_n_splits(X=data, y=y, groups=outer_groups))]
 
-    predictions = pd.DataFrame(data=None, index=y.index, columns=[f"Fold #{i}" for i in range(outer_splitter.get_n_splits(X=data, y=y, groups=outer_groups))])
-    insamplePredictions = []
-    selected_features= []
-    stabl_features= pd.DataFrame(data=None, columns=["Threshold", "min FDP+"])
-    best_params = []
+    predictions = pd.DataFrame(data=None, index=y.index, columns=foldIdx)
+    selected_features= pd.DataFrame(data=False, columns=data.columns, index=foldIdx)
+    if stablFlag:
+        stabl_features= pd.DataFrame(data=None, columns=["Threshold", "min FDP+"], index=foldIdx)
+    else:
+        best_params = []
+        if not ef:
+            insamplePredictions = pd.DataFrame(data=None, index=y.index, columns=foldIdx)
 
     k = 1
     for train, test in (tbar := tqdm(
@@ -89,129 +103,118 @@ def single_omic_simple(
             file=sys.stdout
     )):
         train_idx, test_idx = y.iloc[train].index, y.iloc[test].index
-        groups = outer_groups.loc[train_idx].values if outer_groups is not None else None
+        groups = outer_groups.iloc[train].values if outer_groups is not None else None
 
         fold_selected_features = []
 
-        test_idx_tmp = data.index.intersection(test_idx)
-        X_tmp = data.drop(index=test_idx, errors="ignore")
-        X_test_tmp = data.loc[test_idx_tmp]
+        X_train = data.iloc[train,:]
+        X_test = data.iloc[test,:]
+        y_train = y.iloc[train]
+        y_test = y.iloc[test]
 
-        X_tmp = remove_low_info_samples(X_tmp)
-        y_tmp = y.loc[X_tmp.index]
+        # X_train = remove_low_info_samples(X_train)
+        # y_train = y_train.loc[X_train.index]
+        # groups = outer_groups[X_tmp.index] if outer_groups is not None else None
 
-        groups = outer_groups[X_tmp.index] if outer_groups is not None else None
-
-        X_tmp_std = pd.DataFrame(
-            data=preprocessing.fit_transform(X_tmp),
-            index=X_tmp.index,
-            columns=preprocessing.get_feature_names_out()
-        )
-
-        X_test_tmp_std = pd.DataFrame(
-            data=preprocessing.transform(X_test_tmp),
-            index=X_test_tmp.index,
-            columns=preprocessing.get_feature_names_out()
-        )
-
-        # print(X_tmp.shape,X_test_tmp.shape,X_tmp_std.shape,X_test_tmp_std.shape,y_tmp.shape)
-        # print(groups)
-
-        # __STABL__
-        if "stabl" in estimator_name:
-            estimator.fit(X_tmp_std, y_tmp, groups=groups)
-            tmp_sel_features = list(estimator.get_feature_names_out())
-            fold_selected_features.extend(tmp_sel_features)
-            stabl_features.loc[f'Fold #{k}', "min FDP+"] = estimator.min_fdr_
-            stabl_features.loc[f'Fold #{k}', "Threshold"] = estimator.fdr_min_threshold_
-
-
+        X_train_std = fromPreprocessing(X_train,preprocessing)
+        X_test_std = fromPreprocessing(X_test,preprocessing)
 
         if estimator_name in ["lasso", "alasso","en"]:
             model = clone(estimator)
-            model.fit(X_tmp_std, y_tmp, groups=groups)
+            model.fit(X_train_std, y_train, groups=groups)
             if task_type == "binary":
-                pred = model.predict_proba(X_test_tmp_std)[:, 1]
-                insamplePreds = model.predict_proba(X_tmp_std)[:, 1]
+                pred = model.predict_proba(X_test_std)[:, 1]
+                if not ef:
+                    insamplePreds = model.predict_proba(X_train_std)[:, 1]
             else:
-                pred = model.predict(X_test_tmp_std)
-                insamplePreds = model.predict(X_tmp_std)
-            insamplePredictions.append(insamplePreds)
-            tmp_sel_features = list(X_tmp_std.columns[np.where(model.best_estimator_.coef_.flatten())])
+                pred = model.predict(X_test_std)
+                if not ef:
+                    insamplePreds = model.predict(X_train_std)
+            if not ef:
+                insamplePredictions.loc[train_idx,f'Fold_{k}'] = insamplePreds
+            tmp_sel_features = list(X_train_std.columns[np.where(model.best_estimator_.coef_.flatten())])
             fold_selected_features.extend(tmp_sel_features)
-            predictions.loc[test_idx_tmp, f"Fold #{k}"] = pred
+            predictions.loc[test_idx, f"Fold_{k}"] = pred
             best_params.append(model.best_params_)
 
+        # __STABL__
+        if stablFlag:
+            estimator.fit(X_train_std, y_train, groups=groups)
+            tmp_sel_features = list(estimator.get_feature_names_out())
+            fold_selected_features.extend(tmp_sel_features)
+            stabl_features.loc[f'Fold_{k}', "min FDP+"] = estimator.min_fdr_
+            stabl_features.loc[f'Fold_{k}', "Threshold"] = estimator.fdr_min_threshold_
 
-        if "stabl" in estimator_name:
-            X_train = data.loc[train_idx, fold_selected_features]
-            X_test = data.loc[test_idx, fold_selected_features]
-            y_train = y.loc[train_idx]
+            X_train = X_train[fold_selected_features]
+            X_test = X_test[fold_selected_features]
 
             if len(fold_selected_features) > 0:
                 # Standardization
-                std_pipe = Pipeline(
-                    steps=[
-                        ('imputer', SimpleImputer(strategy="median")),
-                        ('std', StandardScaler())
-                    ]
-                )
-
-                X_train = pd.DataFrame(
-                    data=std_pipe.fit_transform(X_train),
-                    index=X_train.index,
-                    columns=X_train.columns
-                )
-                X_test = pd.DataFrame(
-                    data=std_pipe.transform(X_test),
-                    index=X_test.index,
-                    columns=X_test.columns
-                )
-
+                X_train = fromPreprocessing(X_train,std_pipe)
+                X_test = fromPreprocessing(X_test,std_pipe)
                 # __Final Models__
                 if task_type == "binary":
                     pred = clone(logit).fit(X_train, y_train).predict_proba(X_test)[:, 1].flatten()
-
                 elif task_type == "regression":
                     pred = clone(linreg).fit(X_train, y_train).predict(X_test)
-
                 else:
                     raise ValueError("task_type not recognized.")
 
-                predictions.loc[test_idx, f"Fold #{k}"] = pred
+                predictions.loc[test_idx, f"Fold_{k}"] = pred
 
             else:
                 if task_type == "binary":
-                    predictions.loc[test_idx, f'Fold #{k}'] = [0.5] * len(test_idx)
-
+                    predictions.loc[test_idx, f'Fold_{k}'] = [0.5] * len(test_idx)
                 elif task_type == "regression":
-                    predictions.loc[test_idx, f'Fold #{k}'] = [np.mean(y_train)] * len(test_idx)
+                    predictions.loc[test_idx, f'Fold_{k}'] = [np.mean(y_train)] * len(test_idx)
 
                 else:
                     raise ValueError("task_type not recognized.")
 
-        selected_features.append(fold_selected_features)
+        selected_features.loc[f'Fold_{k}', fold_selected_features] = True
         # print("~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~\n")
-        
-  
         k += 1
 
-    # __SAVING_RESULTS__
+    if stablFlag:
+        return 1,predictions,selected_features,stabl_features
+    else:
+        if ef:
+            return 2,predictions,selected_features,best_params
+        return 0,predictions,selected_features,best_params, insamplePredictions
 
-    if y.name is None:
-        y.name = "outcome"
-
-
-    formatted_features = pd.DataFrame(
-            data={
-                "Fold selected features": selected_features,
-                "Fold nb of features": [len(el) for el in selected_features]
-            },
-            index=[f"Fold {i}" for i in range(outer_splitter.get_n_splits(X=data,groups=outer_groups))]
-        )
-
-
-    return predictions,formatted_features,selected_features,insamplePredictions
+def save_single_omic_results(results,savePath):
+    match results[0]:
+        case 0:
+            preds,selectedFeats,bestParams,insamplePredictions = results[1:]
+            stablFeats = None
+        case 1:
+            preds,selectedFeats,stablFeats = results[1:]
+            bestParams = None
+            insamplePredictions = None
+        case 2:
+            preds,selectedFeats,bestParams = results[1:]
+            stablFeats = None
+            insamplePredictions = None
+    preds.to_csv(Path(savePath,"cvPreds.csv"))
+    selectedFeats.to_csv(Path(savePath,"selectedFeats.csv"))
+    if bestParams is not None:
+        pd.DataFrame(bestParams).to_csv(Path(savePath,"bestParams.csv"))
+    if insamplePredictions is not None:
+        insamplePredictions.to_csv(Path(savePath,"insamplePreds.csv"))
+    if stablFeats is not None:
+        stablFeats.to_csv(Path(savePath,"stablFeats.csv"))
+    featCount = {}
+    for feat in selectedFeats.values.flatten():
+        if feat != np.nan:
+            if feat in featCount:
+                featCount[feat] += 1
+            else:
+                featCount[feat] = 1
+    featCount = pd.DataFrame.from_dict(featCount,orient='index').sort_values(by=0,ascending=False)
+    featCount.to_csv(Path(savePath,"featCount.csv"))
+    
+    
+    
 
         
 def late_fusion_combination_normal(
@@ -353,7 +356,7 @@ def late_fusion_combination_stabl(
 def simpleScores(
         predictions,
         y,
-        formatted_features,
+        features,
         task_type
 ):
     predictions = predictions.median(axis=1)
@@ -377,13 +380,13 @@ def simpleScores(
             cell_value = [f"{model_ap:.3f}", f"{model_ap_CI[0]:.3f}", f"{model_ap_CI[1]:.3f}"]
 
         elif metric == "N features":
-            sel_features = formatted_features["Fold nb of features"]
+            sel_features = np.sum(features, axis=1)
             median_features = np.median(sel_features)
             iqr_features = np.quantile(sel_features, [.25, .75])
             cell_value = [f"{median_features:.3f}", f"{iqr_features[0]:.3f}", f"{iqr_features[1]:.3f}"]
 
         elif metric == "CVS":
-            jaccard_mat = jaccard_matrix(formatted_features["Fold selected features"], remove_diag=False)
+            jaccard_mat = jaccard_matrix(features, remove_diag=False)
             jaccard_val = jaccard_mat[np.triu_indices_from(
                 jaccard_mat, k=1)]
             jaccard_median = np.median(jaccard_val)

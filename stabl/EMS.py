@@ -61,8 +61,8 @@ def spacerize(spaceDict: dict):
     elif spaceDict["type"] == "lin":
         return np.linspace(*spaceDict["val"])
 
-def unroll_parameters(params: dict,ef=False) -> list:
-    models = [k for k in params["general"]["models"].keys() if params["general"]["models"][k]]
+def unroll_parameters(params: dict) -> list:
+    models = [k for k in params["models"].keys() if params["models"][k]]
     stablModels = [m for m in models if "stabl" in m]
     nonStablModels = [m for m in models if "stabl" not in m]
     
@@ -72,11 +72,8 @@ def unroll_parameters(params: dict,ef=False) -> list:
     experiments = [{key: value for key, value in zip(nonStablParams.keys(), combo)} for combo in itertools.product(*nonStablParams.values())]
     experiments.extend([{key: value for key, value in zip(stablParams.keys(), combo)} for combo in itertools.product(*stablParams.values())])
     for exp in experiments:
-        exp["varType"] = params["general"]["varType"]
-        exp["innerCVvals"] = params["general"]["innerCVvals"]
-        exp["seed"] = params["general"]["seed"]
-        if exp["seed"] == False:
-            exp["seed"] = None
+        for key in params["general"].keys():
+            exp[key] = params["general"][key]
         for modelVariableName in params[exp["model"]].keys():
             if modelVariableName == "hyperparameters":
                 for modelHyperParamName in params[exp["model"]]["hyperparameters"].keys():
@@ -85,42 +82,34 @@ def unroll_parameters(params: dict,ef=False) -> list:
                 exp[modelVariableName] = params[exp["model"]][modelVariableName]
         exp["varNames"] = list(params[exp["model"]]["hyperparameters"].keys())
     
-    num = params["datasets"]["number"]
+    num = len(params["datasets"])
     if num > 1:
         experimentsFull = []
         for exp in experiments:
+            cvSeed = np.random.randint(2**32-1)
             for i in range(num):
                 newExp = copy.deepcopy(exp)
-                newExp["dataset"] = params["datasets"]["names"][i]
-                experimentsFull.append(newExp)
-            if ef:
-                newExp = copy.deepcopy(exp)
-                newExp["dataset"] = "EarlyFusion"
+                newExp["dataset"] = params["datasets"][i]
+                newExp["cvSeed"] = cvSeed
                 experimentsFull.append(newExp)
         return experimentsFull
     
+    h = 0
+    l = 0
     for exp in experiments:
-        exp["dataset"] = params["datasets"]["names"][0]
+        if 'en' in exp['model']:
+            exp["shorthand"] = f"{h}_h"
+            h += 1
+        else:
+            exp["shorthand"] = f"{l}_l"
+            l += 1
     return experiments
 
-# def parse_params(paramsFile: str)->tuple:
-#     params = read_json(paramsFile)
-#     paramList = unroll_parameters(params)
-#     os.makedirs("./tempProfiles/", exist_ok=True)
-#     highImpactIdx = np.argwhere(["en" in p["model"] for p in paramList]).flatten().astype(int)
-#     lowImpactIdx = np.array(list(set(range(len(paramList))).difference(set(highImpactIdx))))
-#     np.savetxt("./tempProfiles/highImpactIdx.txt",highImpactIdx,fmt="%i")
-#     np.savetxt("./tempProfiles/lowImpactIdx.txt",lowImpactIdx,fmt="%i")
-#     print(len(lowImpactIdx))
-#     print(len(highImpactIdx))
+
     
-        
-
-
 
 def generateModel(paramSet: dict):
     preprocessingList = []
-    #match paramSet["varType"]:
     if paramSet["varType"] == "thresh":
         preprocessingList.append(("varianceThreshold",VarianceThreshold(paramSet["varValues"])))
     else:
@@ -132,10 +121,10 @@ def generateModel(paramSet: dict):
     preprocessing = Pipeline(steps=preprocessingList)
     lambdaGrid = None
     maxIter = int(paramSet["max_iter"])
-    if paramSet["seed"] is not None:
-        seed = int(paramSet["seed"])
-    else:
+    if paramSet["useRandomSeed"]:
         seed = None
+    else:
+        seed = int(paramSet["seed"])
     if paramSet["model"] == "stabl_lasso" or  paramSet["model"] == "lasso":
         submodel = LogisticRegression(penalty="l1", class_weight="balanced", 
                                             max_iter=maxIter, solver="liblinear", random_state=seed)
