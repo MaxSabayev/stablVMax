@@ -56,7 +56,9 @@ def parse_params(paramsFile: str)->None:
             sc = re.sub("V","h",sc)
             file.write(sc)
 
-    return lowCount !=0, highCount != 0
+    print(lowCount  != 0)
+    print(highCount != 0)
+
 # if __name__ == "__main__":
 #     parser = argparse.ArgumentParser()
 #     parser.add_argument("paramsPath", type=str, default="./params.json")
