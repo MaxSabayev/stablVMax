@@ -26,7 +26,8 @@ std_pipe = Pipeline(
     ]
 )
 
-fromPreprocessing = lambda data,prepro: pd.DataFrame(data=prepro.transform(data),index=data.index,columns=prepro.get_feature_names_out())
+fromPreprocessing = lambda data,prepro: pd.DataFrame(data=prepro.fit_transform(data),index=data.index,columns=prepro.get_feature_names_out())
+fromPreprocessingRep = lambda data,prepro: pd.DataFrame(data=prepro.transform(data),index=data.index,columns=prepro.get_feature_names_out())
 
 @ignore_warnings(category=ConvergenceWarning)
 def single_omic_simple(
@@ -117,7 +118,7 @@ def single_omic_simple(
         # groups = outer_groups[X_tmp.index] if outer_groups is not None else None
 
         X_train_std = fromPreprocessing(X_train,preprocessing)
-        X_test_std = fromPreprocessing(X_test,preprocessing)
+        X_test_std = fromPreprocessingRep(X_test,preprocessing)
 
         if estimator_name in ["lasso", "alasso","en"]:
             model = clone(estimator)
@@ -151,7 +152,7 @@ def single_omic_simple(
             if len(fold_selected_features) > 0:
                 # Standardization
                 X_train = fromPreprocessing(X_train,std_pipe)
-                X_test = fromPreprocessing(X_test,std_pipe)
+                X_test = fromPreprocessingRep(X_test,std_pipe)
                 # __Final Models__
                 if task_type == "binary":
                     pred = clone(logit).fit(X_train, y_train).predict_proba(X_test)[:, 1].flatten()

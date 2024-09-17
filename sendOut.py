@@ -104,8 +104,8 @@ if __name__ == "__main__":
     parser.add_argument("intensity",type=str,default='l',nargs="?")
     args = parser.parse_args()
     if args.mode == 0:
-        path = Path(savePathRoot,args.intensity,args.idx)
-        experiment(read_json(Path(path,"params.json"),args.idx,path))
+        path = Path(savePathRoot,str(args.intensity),str(args.idx))
+        experiment(read_json(Path(path,"params.json")),args.idx,path)
     # elif args.mode == 1:
         # postProcess(paramFilePath)
         

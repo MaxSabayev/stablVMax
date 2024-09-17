@@ -15,7 +15,7 @@ defaultScript = """#!/usr/bin/bash
 #SBATCH --mem=8GB
 
 ml python/3.12.1
-time python3 ./sendOut.py 0 ${SLURM_ARRAY_TASK_ID} MODE"""
+time python3 ./sendOut.py 0 ${SLURM_ARRAY_TASK_ID} V"""
 
 def parse_params(paramsFile: str)->None:
     params = read_json(paramsFile)
@@ -42,18 +42,16 @@ def parse_params(paramsFile: str)->None:
 
     if lowCount != 0:
         with open('./temp/arrayLow.sh', 'w') as file:
-            sc = re.sub("MODE","0",script)
+            sc = re.sub("V","l",script)
             sc = re.sub("REP",str(lowCount-1),sc)
             sc = re.sub("COUNT","8",sc)
-            sc = re.sub("V","l",sc)
             file.write(sc)
 
     if highCount != 0:
         with open('./temp/arrayHigh.sh', 'w') as file:
-            sc = re.sub("MODE","1",script)
+            sc = re.sub("V","h",script)
             sc = re.sub("REP",str(highCount-1),sc)
             sc = re.sub("COUNT","32",sc)
-            sc = re.sub("V","h",sc)
             file.write(sc)
 
     print(int(lowCount  != 0))
