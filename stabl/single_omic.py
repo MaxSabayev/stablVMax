@@ -86,7 +86,7 @@ def single_omic_simple(
     """
 
     stablFlag = "stabl" in estimator_name
-    foldIdx = [f"Fold_{i}" for i in range(outer_splitter.get_n_splits(X=data, y=y, groups=outer_groups))]
+    foldIdx = [f"Fold_{i+1}" for i in range(outer_splitter.get_n_splits(X=data, y=y, groups=outer_groups))]
 
     predictions = pd.DataFrame(data=None, index=y.index, columns=foldIdx)
     selected_features= pd.DataFrame(data=False, columns=data.columns, index=foldIdx)

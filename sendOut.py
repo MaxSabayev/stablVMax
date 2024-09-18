@@ -49,7 +49,7 @@ def experiment(paramSet: dict,idx: int,savePath: str):
     
 
     scores = simpleScores(results[1],y,results[2],taskType)
-    scores.to_csv(Path(savePath,name,"cvScores.csv"))
+    scores.to_csv(Path(savePath,"cvScores.csv"))
 
     if "stabl" in paramSet["model"]:
         data_std = pd.DataFrame(
