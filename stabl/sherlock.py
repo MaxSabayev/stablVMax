@@ -79,9 +79,8 @@ def parse_params(paramsFile: str)->None:
 def run_end(paramsFile: str,
             data: pd.DataFrame,
             y: pd.Series,
-            taskType: str,
-            cvSplitterF: function =None, 
-            outerGroups = None)->None:
+            taskType: str
+            )->None:
     params = read_json(paramsFile)
     intensities = os.listdir("./results/")
     ef = "EarlyFusion" in params["datasets"]
