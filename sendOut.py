@@ -1,4 +1,4 @@
-from stabl.single_omic import single_omic_simple, simpleScores,save_single_omic_results
+from stabl.single_omic import single_omic_simple, save_single_omic_results
 from stabl.EMS import generateModel,read_json,write_json,unroll_parameters
 from sklearn.model_selection import LeaveOneOut,LeaveOneGroupOut, RepeatedStratifiedKFold
 from stabl.stabl import save_stabl_results
@@ -45,11 +45,7 @@ def experiment(paramSet: dict,idx: int,savePath: str):
         taskType,
         ef = ef
     )
-    save_single_omic_results(results,savePath)
-    
-
-    scores = simpleScores(results[1],y,results[2],taskType)
-    scores.to_csv(Path(savePath,"cvScores.csv"))
+    save_single_omic_results(y,results,savePath,taskType)
 
     if "stabl" in paramSet["model"]:
         data_std = pd.DataFrame(
@@ -64,29 +60,29 @@ def experiment(paramSet: dict,idx: int,savePath: str):
 
 
 
-# def postProcess(paramFilePath: str):
-#     paramList = unroll_parameters(read_json(paramFilePath))
-#     n = len(paramList)
-#     scores = None
-#     for i in range(n):
-#         if scores is None:
-#             scores = pd.read_csv(Path(savePath,str(i),"cvScores.csv"),index_col=0)
-#         else:
-#             scores = pd.concat((scores, pd.read_csv(Path(savePath,str(i),"cvScores.csv"),index_col=0)),axis=1)
-#     scores = scores.T
-#     scores.index = range(n)
+def postProcess(paramFilePath: str):
+    paramList = unroll_parameters(read_json(paramFilePath))
+    n = len(paramList)
+    scores = None
+    for i in range(n):
+        if scores is None:
+            scores = pd.read_csv(Path(savePath,str(i),"cvScores.csv"),index_col=0)
+        else:
+            scores = pd.concat((scores, pd.read_csv(Path(savePath,str(i),"cvScores.csv"),index_col=0)),axis=1)
+    scores = scores.T
+    scores.index = range(n)
 
-#     scores["names"] = [f"{paramSet["model"]}_{b}" for paramSet,b in zip(paramList,scores.index)]
-#     for i in range(n):
-#         os.rename(Path(savePath,str(i)),Path(savePath,scores.loc[i,"names"]))
-#     scores = scores.reset_index(drop=True).set_index("names")
-#     scores = scores.sort_values(by=orderby,axis=0,ascending=False)
+    scores["names"] = [f"{paramSet["model"]}_{b}" for paramSet,b in zip(paramList,scores.index)]
+    for i in range(n):
+        os.rename(Path(savePath,str(i)),Path(savePath,scores.loc[i,"names"]))
+    scores = scores.reset_index(drop=True).set_index("names")
+    scores = scores.sort_values(by=orderby,axis=0,ascending=False)
     
-    # scoresBottom = scores.iloc[keepTop:,:]
-    # os.makedirs(Path(savePath,"poor"),exist_ok=True)
-    # for name in scoresBottom.index:
-    #     os.rename(Path(savePath,name),Path(savePath,"poor",name))
-    # scores.to_csv(Path(savePath,"scores.csv"))
+    scoresBottom = scores.iloc[keepTop:,:]
+    os.makedirs(Path(savePath,"poor"),exist_ok=True)
+    for name in scoresBottom.index:
+        os.rename(Path(savePath,name),Path(savePath,"poor",name))
+    scores.to_csv(Path(savePath,"scores.csv"))
         
 
 

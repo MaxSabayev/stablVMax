@@ -86,6 +86,7 @@ def unroll_parameters(params: dict) -> list:
         exp["varNames"] = list(params[exp["model"]]["hyperparameters"].keys())
     
     num = len(params["datasets"])
+    lfTag = 0
     if num > 1:
         experimentsFull = []
         for exp in experiments:
@@ -94,7 +95,9 @@ def unroll_parameters(params: dict) -> list:
                 newExp = copy.deepcopy(exp)
                 newExp["dataset"] = params["datasets"][i]
                 newExp["cvSeed"] = cvSeed
+                newExp["lfTag"] = lfTag
                 experimentsFull.append(newExp)
+            lfTag += 1
         experiments = experimentsFull
     
     h = 0
@@ -166,46 +169,4 @@ def generateModel(paramSet: dict):
     return preprocessing,model
 
 
-
-    
-# def do_experiment(instance: callable, parameters: list, client: Client): #db: Databases):
-#     instance_count = len(parameters)
-#     i = 0
-#     logger.info(f'Number of Instances to calculate: {instance_count}')
-#     # Start the computation.
-#     tick = time.perf_counter()
-#     futures = client.map(lambda p: instance(p), parameters, batch_size=BATCH_SIZE)
-#     for batch in as_completed(futures, with_results=True).batches():
-#         for future, result in batch:
-#             i += 1
-#             if not (i % 10):  # Log results every tenth output
-#                 tock = time.perf_counter() - tick
-#                 remaining_count = instance_count - i
-#                 s_i = tock / i
-#                 logger.info(f'Count: {i}; Time: {round(tock)}; Seconds/Instance: {s_i:0.4f}; ' +
-#                             f'Remaining (s): {round(remaining_count * s_i)}; Remaining Count: {remaining_count}')
-#                 logger.info(result)
-#             future.release()  # As these are Embarrassingly Parallel tasks, clean up memory.
-
-#     total_time = time.perf_counter() - tick
-#     logger.info(f"Performed experiment in {total_time:0.4f} seconds")
-#     if instance_count > 0:
-#         logger.info(f"Count: {instance_count}, Seconds/Instance: {(total_time / instance_count):0.4f}")
-
-
-# def do_on_cluster(parameterPath: str, function: callable, client: Client):
-#     logger.info(f'{client}')
-#     parameterList = read_json(parameterPath)
-#     # Save the experiment domain.
-#     record_experiment(parameterList)
-
-#     # Prepare parameters.
-#     parameters = unroll_parameters(parameterList)
-
-#     if len(parameters) > 0:
-#         random.shuffle(parameters)
-#         do_experiment(function, parameters, client)
-#     else:
-#         logger.warning('Empty parameters.')
-#     client.shutdown()
 

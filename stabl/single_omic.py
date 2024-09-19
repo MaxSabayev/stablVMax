@@ -15,6 +15,7 @@ from sklearn.utils._testing import ignore_warnings
 from sklearn.metrics import roc_auc_score, average_precision_score, r2_score, mean_squared_error, mean_absolute_error
 from .utils import compute_CI
 from .metrics import jaccard_matrix
+from .visualization import boxplot_binary_predictions, plot_roc
 from pathlib import Path
 
 logit = LogisticRegression(penalty=None, class_weight="balanced", max_iter=int(1e6))
@@ -111,11 +112,6 @@ def single_omic_simple(
         X_train = data.iloc[train,:]
         X_test = data.iloc[test,:]
         y_train = y.iloc[train]
-        y_test = y.iloc[test]
-
-        # X_train = remove_low_info_samples(X_train)
-        # y_train = y_train.loc[X_train.index]
-        # groups = outer_groups[X_tmp.index] if outer_groups is not None else None
 
         X_train_std = fromPreprocessing(X_train,preprocessing)
         X_test_std = fromPreprocessingRep(X_test,preprocessing)
@@ -183,7 +179,7 @@ def single_omic_simple(
             return 2,predictions,selected_features,best_params
         return 0,predictions,selected_features,best_params, insamplePredictions
 
-def save_single_omic_results(results,savePath):
+def save_single_omic_results(y,results,savePath,taskType):
     match results[0]:
         case 0:
             preds,selectedFeats,bestParams,insamplePredictions = results[1:]
@@ -204,69 +200,48 @@ def save_single_omic_results(results,savePath):
         insamplePredictions.to_csv(Path(savePath,"insamplePreds.csv"))
     if stablFeats is not None:
         stablFeats.to_csv(Path(savePath,"stablFeats.csv"))
-    featCount = {}
-    for feat in selectedFeats.values.flatten():
-        if feat != np.nan:
-            if feat in featCount:
-                featCount[feat] += 1
-            else:
-                featCount[feat] = 1
-    featCount = pd.DataFrame.from_dict(featCount,orient='index').sort_values(by=0,ascending=False)
+    featCount = selectedFeats.sum(axis=1).T
     featCount.to_csv(Path(savePath,"featCount.csv"))
-    
-    
-    
+
+    scores = simpleScores(results[1],y,results[2],taskType)
+    scores.to_csv(Path(savePath,"cvScores.csv"))
+    if taskType == "binary":
+        plot_roc(y,results[1].median(axis=1),show_fig=False,save_path=Path(savePath,"ROC.png"),save_figs=True)  
+        boxplot_binary_predictions(y,results[1].median(axis=1),show_fig=False,save_path=Path(savePath,"predBoxplot.png"),save_figs=True)
 
         
 def late_fusion_combination_normal(
-        data,
         y,
         oosPredictions,
         isPredictions,
-        outer_splitter,
-        outer_groups=None
     ):
     """
     data : pd.DataFrame
         pandas DataFrame containing the original data
-    oosPredictions : list of pd.Series
+    oosPredictions : list of pd.DataFrames
         for each omic, the pandas DataFrame containing the oos predictions
     isPredictions : list of pd.DataFrames
         for each omic, the in-sample predictions over each of the folds of the crosvalidation
 
     """
-    predictions = pd.DataFrame(data=None, index=y.index)
-    k = 1
-    for train, test in (tbar := tqdm(
-            outer_splitter.split(data, y, groups=outer_groups),
-            total=outer_splitter.get_n_splits(X=data, y=y, groups=outer_groups),
-            file=sys.stdout
-    )):
-        train_idx, test_idx = y.iloc[train].index, y.iloc[test].index
-
-        foldData = pd.concat([pd.Series(pred[k-1]) for pred in isPredictions], axis=1).fillna(0.5).to_numpy()
-        # foldData = np.nan_to_num(np.stack([ np.array(pred[k-1]) for pred in isPredictions]))
-        foldY = pd.concat([pred.loc[test_idx, f'Fold #{k}'] for pred in oosPredictions], axis=1).fillna(0.5).to_numpy()
-
-        yFit = y.loc[train_idx].to_numpy().flatten()
-        # print(foldData.shape, foldY.shape, yFit.shape, np.sum(np.isnan(foldData)), np.sum(np.isnan(foldY)),np.sum(np.isnan(yFit)))
-        beta,_ = nnls(foldData, yFit)
-        print(beta)
-        prediction = foldY @ beta
-
-        predictions.loc[test_idx, f"Fold #{k}"] = prediction
-
-        k += 1
-    
+    folds= isPredictions[0].columns
+    predictions = pd.DataFrame(data=None, index=y.index, columns=folds)
+    for fold in folds:
+        foldData = pd.concat([df[fold] for df in isPredictions],axis=1).dropna(how="all",axis=0)
+        foldY = pd.concat([pred[fold] for pred in oosPredictions],axis=1).dropna(how="all",axis=0)
+        fitY = y.loc[foldData.index].to_numpy().flatten()
+        beta,_ = nnls(foldData.to_numpy(), fitY)
+        prediction = foldY.to_numpy() @ beta
+        predictions.loc[foldY.index, fold] = prediction
     return predictions
+
 
 def late_fusion_combination_stabl(
         data,
         y,
         selected_features,
-        outer_splitter,
-        task_type,
-        outer_groups=None
+        splits,
+        task_type
     ):
     """
     data : pd.DataFrame
@@ -274,82 +249,39 @@ def late_fusion_combination_stabl(
     selected_features : list of lists
         for each omic, the list of selected features over each of the folds of the crosvalidation
     """
-    predictions = pd.DataFrame(data=None, index=y.index)
-    total_features = []
-    k = 1
-    for train, test in (tbar := tqdm(
-            outer_splitter.split(data, y, groups=outer_groups),
-            total=outer_splitter.get_n_splits(X=data, y=y, groups=outer_groups),
-            file=sys.stdout
-    )):
-        train_idx, test_idx = y.iloc[train].index, y.iloc[test].index
+    predictions = pd.DataFrame(data=None, index=y.index, columns=selected_features.index)
+    for k in range(len(splits)):
+        trainIdx, testIdx = splits[k]
+        fold_selected_features = selected_features.iloc[k,:] 
 
-        fold_selected_features = []
-        for omic in selected_features:
-            fold_selected_features.extend(omic[k-1])
-        total_features.append(fold_selected_features)
-
-        X_train = data.loc[train_idx, fold_selected_features]
-        X_test = data.loc[test_idx, fold_selected_features]
-        y_train = y.loc[train_idx]
+        X_train = data.iloc[trainIdx,fold_selected_features]
+        X_test = data.iloc[testIdx,fold_selected_features]
+        y_train = y.iloc[trainIdx]
 
         if len(fold_selected_features) > 0:
             # Standardization
-            std_pipe = Pipeline(
-                steps=[
-                    ('imputer', SimpleImputer(strategy="median")),
-                    ('std', StandardScaler())
-                ]
-            )
-
-            X_train = pd.DataFrame(
-                data=std_pipe.fit_transform(X_train),
-                index=X_train.index,
-                columns=X_train.columns
-            )
-            X_test = pd.DataFrame(
-                data=std_pipe.transform(X_test),
-                index=X_test.index,
-                columns=X_test.columns
-            )
-
+            X_train = fromPreprocessing(X_train,std_pipe)
+            X_test = fromPreprocessingRep(X_test,std_pipe)
             # __Final Models__
             if task_type == "binary":
                 pred = clone(logit).fit(X_train, y_train).predict_proba(X_test)[:, 1].flatten()
-                print(pred, y.loc[test_idx].to_numpy().flatten())
-
-
             elif task_type == "regression":
                 pred = clone(linreg).fit(X_train, y_train).predict(X_test)
-
             else:
                 raise ValueError("task_type not recognized.")
 
-            predictions.loc[test_idx, f"Fold #{k}"] = pred
+            predictions.loc[testIdx, f"Fold_{k}"] = pred
 
         else:
             if task_type == "binary":
-                predictions.loc[test_idx, f'Fold #{k}'] = [0.5] * len(test_idx)
-
+                predictions.loc[testIdx, f'Fold_{k}'] = [0.5] * len(testIdx)
             elif task_type == "regression":
-                predictions.loc[test_idx, f'Fold #{k}'] = [np.mean(y_train)] * len(test_idx)
+                predictions.loc[testIdx, f'Fold_{k}'] = [np.mean(y_train)] * len(testIdx)
 
             else:
                 raise ValueError("task_type not recognized.")
-        
-
-        k += 1
-
-
-    formatted_features = pd.DataFrame(
-            data={
-                "Fold selected features": total_features,
-                "Fold nb of features": [len(el) for el in total_features]
-            },
-            index=[f"Fold {i}" for i in range(outer_splitter.get_n_splits(X=data,groups=outer_groups))]
-        )
     
-    return predictions,formatted_features
+    return predictions
 
 
 
@@ -388,8 +320,7 @@ def simpleScores(
 
         elif metric == "CVS":
             jaccard_mat = jaccard_matrix(features, remove_diag=False)
-            jaccard_val = jaccard_mat[np.triu_indices_from(
-                jaccard_mat, k=1)]
+            jaccard_val = jaccard_mat[np.triu_indices_from(jaccard_mat, k=1)]
             jaccard_median = np.median(jaccard_val)
             jaccard_iqr = np.quantile(jaccard_val, [.25, .75])
             cell_value = [f"{jaccard_median:.3f}",f"{jaccard_iqr[0]:.3f}", f"{jaccard_iqr[1]:.3f}"]
