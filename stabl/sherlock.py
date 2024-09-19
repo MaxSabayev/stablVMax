@@ -1,5 +1,5 @@
 from .EMS import read_json,unroll_parameters,write_json
-from .single_omic import simple_scores,late_fusion_combination_normal,late_fusion_combination_stabl
+from .single_omic import simpleScores,late_fusion_combination_normal,late_fusion_combination_stabl
 import os
 import numpy as np
 import pandas as pd
@@ -116,7 +116,7 @@ def run_end(paramsFile: str,
                 oosPreds = [pd.read_csv(Path(pathR,e,"cvPreds.csv"),index_col=0) for e in grp]
                 selectedFeats = pd.concat([pd.read_csv(Path(pathR,e,"selectedFeats.csv"),index_col=0)for e in grp] ,axis=1)
                 lfPreds = late_fusion_combination_normal(y,oosPreds,isPreds)
-                lfScores = simple_scores(y,lfPreds,selectedFeats,taskType)
+                lfScores = simpleScores(y,lfPreds,selectedFeats,taskType)
                 featCount = selectedFeats.sum(axis=1).T
                 pathLF = Path(pathR,f"lf_{grp[0]}")
                 p = dict(existingParams[grp[0]])
