@@ -6,6 +6,7 @@ import pandas as pd
 import re
 import argparse
 from pathlib import Path
+from .visualization import boxplot_binary_predictions, plot_roc
 
 defaultScript = """#!/usr/bin/bash
 #SBATCH --job-name=NAME_V
@@ -73,7 +74,6 @@ def parse_params(paramsFile: str)->None:
         eScript = re.sub("NAME",params["Experiment_Name"],endScript)
         file.write(eScript)
     
-    return
 
 
 def run_end(paramsFile: str,
@@ -127,6 +127,9 @@ def run_end(paramsFile: str,
                 write_json(p,Path(pathLF,"params.json"))
                 lfScores.columns = [f"{p["model"]}_{grp[0]}_{intensity}_lf" ]
                 scores = pd.concat((scores,lfScores),axis=1)
+                if taskType == "binary":
+                    plot_roc(y,lfPreds.median(axis=1),show_fig=False,path=Path(pathLF,"ROC.png"),export_file=True)  
+                    boxplot_binary_predictions(y,lfPreds.median(axis=1),show_fig=False,path=Path(pathLF,"predBoxplot.png"),export_file=True)
 
             for grp in lfGroupsSTABL:
                 selectedFeats = pd.concat([pd.read_csv(Path(pathR,e,"selectedFeats.csv"),index_col=0)for e in grp] ,axis=1)
@@ -144,5 +147,9 @@ def run_end(paramsFile: str,
                 write_json(p,Path(pathLF,"params.json"))
                 lfScores.columns = [f"{p["model"]}_{grp[0]}_{intensity}_lf" ]
                 scores = pd.concat((scores,lfScores),axis=1)
+                if taskType == "binary":
+                    plot_roc(y,lfPreds.median(axis=1),show_fig=False,path=Path(pathLF,"ROC.png"),export_file=True)  
+                    boxplot_binary_predictions(y,lfPreds.median(axis=1),show_fig=False,path=Path(pathLF,"predBoxplot.png"),export_file=True)
+
     scores.T.to_csv("./results/cvScores.csv")
     return 

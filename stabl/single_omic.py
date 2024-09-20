@@ -206,8 +206,8 @@ def save_single_omic_results(y,results,savePath,taskType):
     scores = simpleScores(results[1],y,results[2],taskType)
     scores.to_csv(Path(savePath,"cvScores.csv"))
     if taskType == "binary":
-        plot_roc(y,results[1].median(axis=1),show_fig=False,save_path=Path(savePath,"ROC.png"),save_figs=True)  
-        boxplot_binary_predictions(y,results[1].median(axis=1),show_fig=False,save_path=Path(savePath,"predBoxplot.png"),save_figs=True)
+        plot_roc(y,results[1].median(axis=1),show_fig=False,path=Path(savePath,"ROC.png"),export_file=True)  
+        boxplot_binary_predictions(y,results[1].median(axis=1),show_fig=False,path=Path(savePath,"predBoxplot.png"),export_file=True)
 
         
 def late_fusion_combination_normal(
