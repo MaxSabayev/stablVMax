@@ -89,14 +89,14 @@ def single_omic_simple(
     stablFlag = "stabl" in estimator_name
     foldIdx = [f"Fold_{i+1}" for i in range(outer_splitter.get_n_splits(X=data, y=y, groups=outer_groups))]
 
-    predictions = pd.DataFrame(data=None, index=y.index, columns=foldIdx)
+    predictions = pd.DataFrame(index=y.index, columns=foldIdx,dtype=float)
     selected_features= pd.DataFrame(data=False, columns=data.columns, index=foldIdx)
     if stablFlag:
-        stabl_features= pd.DataFrame(data=None, columns=["Threshold", "min FDP+"], index=foldIdx)
+        stabl_features= pd.DataFrame( columns=["Threshold", "min FDP+"], index=foldIdx)
     else:
         best_params = []
         if not ef:
-            insamplePredictions = pd.DataFrame(data=None, index=y.index, columns=foldIdx)
+            insamplePredictions = pd.DataFrame(index=y.index, columns=foldIdx, dtype = float)
 
     k = 1
     for train, test in (tbar := tqdm(

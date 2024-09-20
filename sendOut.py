@@ -10,7 +10,7 @@ import os
 
 
 df= pd.read_csv(f"../../data/dataAP.csv",index_col=0)
-y =  pd.read_csv(f"../../data/outcomeAP.csv",index_col=0).Group
+y =  pd.read_csv(f"../../data/outcomeAP.csv",index_col=0,dtype=int).Group
 taskType = 'binary'
 
 orderby = "ROC AUC" if taskType == "binary" else "R2"
