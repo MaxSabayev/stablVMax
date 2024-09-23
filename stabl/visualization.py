@@ -494,6 +494,8 @@ def boxplot_binary_predictions(
         color='.9',
         showfliers=False,
         palette=palette,
+        hue= y_true,
+        legend=False,
         boxprops=dict(alpha=.25),
         width=.5
     )

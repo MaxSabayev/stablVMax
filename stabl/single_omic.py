@@ -200,7 +200,7 @@ def save_single_omic_results(y,results,savePath,taskType):
         insamplePredictions.to_csv(Path(savePath,"insamplePreds.csv"))
     if stablFeats is not None:
         stablFeats.to_csv(Path(savePath,"stablFeats.csv"))
-    featCount = selectedFeats.sum(axis=1).T
+    featCount = selectedFeats.sum(axis=0).T.sort_values(ascending=False)
     featCount.to_csv(Path(savePath,"featCount.csv"))
 
     scores = simpleScores(results[1],y,results[2],taskType)
@@ -225,7 +225,7 @@ def late_fusion_combination_normal(
 
     """
     folds= isPredictions[0].columns
-    predictions = pd.DataFrame(data=None, index=y.index, columns=folds)
+    predictions = pd.DataFrame(index=y.index, columns=folds,dtype=float)
     for fold in folds:
         foldData = pd.concat([df[fold] for df in isPredictions],axis=1).dropna(how="all",axis=0)
         foldY = pd.concat([pred[fold] for pred in oosPredictions],axis=1).dropna(how="all",axis=0)
@@ -249,10 +249,10 @@ def late_fusion_combination_stabl(
     selected_features : list of lists
         for each omic, the list of selected features over each of the folds of the crosvalidation
     """
-    predictions = pd.DataFrame(data=None, index=y.index, columns=selected_features.index)
+    predictions = pd.DataFrame(index=y.index, columns=selected_features.index,dtype=float)
     for k in range(len(splits)):
         trainIdx, testIdx = splits[k]
-        fold_selected_features = selected_features.iloc[k,:] 
+        fold_selected_features = np.argwhere(selected_features.iloc[k,:]).flatten()
 
         X_train = data.iloc[trainIdx,fold_selected_features]
         X_test = data.iloc[testIdx,fold_selected_features]
@@ -270,13 +270,13 @@ def late_fusion_combination_stabl(
             else:
                 raise ValueError("task_type not recognized.")
 
-            predictions.loc[testIdx, f"Fold_{k}"] = pred
+            predictions.iloc[testIdx, k] = pred
 
         else:
             if task_type == "binary":
-                predictions.loc[testIdx, f'Fold_{k}'] = [0.5] * len(testIdx)
+                predictions.iloc[testIdx, k] = [0.5] * len(testIdx)
             elif task_type == "regression":
-                predictions.loc[testIdx, f'Fold_{k}'] = [np.mean(y_train)] * len(testIdx)
+                predictions.iloc[testIdx, k] = [np.mean(y_train)] * len(testIdx)
 
             else:
                 raise ValueError("task_type not recognized.")

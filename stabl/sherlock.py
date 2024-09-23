@@ -4,9 +4,9 @@ import os
 import numpy as np
 import pandas as pd
 import re
-import argparse
 from pathlib import Path
 from .visualization import boxplot_binary_predictions, plot_roc
+import time
 
 defaultScript = """#!/usr/bin/bash
 #SBATCH --job-name=NAME_V
@@ -85,7 +85,7 @@ def run_end(paramsFile: str,
     intensities = os.listdir("./results/")
     ef = "EarlyFusion" in params["datasets"]
     n = len(params["datasets"])
-    m = len(params["datasets"]) -ef
+    m = n -ef
     lf = m > 1
     scores = None
     for intensity in intensities:
@@ -93,10 +93,9 @@ def run_end(paramsFile: str,
         exps = []
         existingParams = []
         for exp in os.listdir(pathR):
-            path = f"{pathR}{exp}/"
-            if os.path.exists(Path(pathR,"cvScores.csv")):
-                existingParams.append(read_json(Path(pathR,"params.json")))
-                sc = pd.read_csv(Path(pathR,"cvScores.csv"),index_col=0,names=[f"{existingParams[-1]["model"]}_{exp}_{intensity}"])
+            if os.path.exists(Path(pathR,exp,"cvScores.csv")):
+                existingParams.append(read_json(Path(pathR,exp,"params.json")))
+                sc = pd.read_csv(Path(pathR,exp,"cvScores.csv"),index_col=0,names=[f"{existingParams[-1]["model"]}_{exp}_{intensity}"],header=1)
                 if scores is None:
                     scores = sc
                 else:
@@ -108,17 +107,46 @@ def run_end(paramsFile: str,
             lfGroups = np.array([np.argwhere(lfGroupTags == i).flatten() for i in np.unique(lfGroupTags)])
             lfGroupsSTABL = [[existingParams[ee]["shorthand"].split("_")[0] for ee in e if existingParams[ee]["dataset"] != "EarlyFusion" and "stabl" in existingParams[ee]["model"]] for e in lfGroups]
             lfGroupsNonSTABL = [[existingParams[ee]["shorthand"].split("_")[0] for ee in e if existingParams[ee]["dataset"] != "EarlyFusion" and "stabl" not in existingParams[ee]["model"]] for e in lfGroups]
+            lfGroupsSTABL = [e for e in lfGroupsSTABL if len(e) > 1]
+            lfGroupsNonSTABL = [e for e in lfGroupsNonSTABL if len(e) > 1]
+
+            for grp in lfGroupsSTABL:
+                print(grp)
+                selectedFeats = pd.concat([pd.read_csv(Path(pathR,e,"selectedFeats.csv"),index_col=0)for e in grp] ,axis=1)
+                prd = pd.read_csv(Path(pathR,grp[0],"cvPreds.csv"),index_col=0)
+                splits = [[np.argwhere(prd[col].isna()).flatten(),np.argwhere(prd[col].isna()).flatten()] for col in prd.columns]
+                lfPreds = late_fusion_combination_stabl(data,y,selectedFeats,splits,taskType)
+                tts = time.time()
+                lfScores = simpleScores(lfPreds,y,selectedFeats,taskType)
+                print(time.time()-tts)
+                featCount = selectedFeats.sum(axis=0).T.sort_values(ascending=False)
+                pathLF = Path(pathR,f"lf_{grp[0]}")
+                p = dict(existingParams[int(grp[0])])
+                p["dataset"] = "LateFusion"
+                os.makedirs(pathLF,exist_ok=True)
+                featCount.to_csv(Path(pathLF,"featCount.csv"))
+                lfScores.to_csv(Path(pathLF,"cvScores.csv"))
+                lfPreds.to_csv(Path(pathLF,"cvPreds.csv"))
+                write_json(p,Path(pathLF,"params.json"))
+                lfScores.columns = [f"{p["model"]}_{grp[0]}_{intensity}_lf" ]
+                scores = pd.concat((scores,lfScores),axis=1)
+                if taskType == "binary":
+                    plot_roc(y,lfPreds.median(axis=1),show_fig=False,path=Path(pathLF,"ROC.png"),export_file=True)  
+                    boxplot_binary_predictions(y,lfPreds.median(axis=1),show_fig=False,path=Path(pathLF,"predBoxplot.png"),export_file=True)
 
 
             for grp in lfGroupsNonSTABL:
-                isPreds = [pd.read_csv(Path(pathR,e,"inSamplePredictions.csv"),index_col=0) for e in grp]
+                print(grp)
+                isPreds = [pd.read_csv(Path(pathR,e,"insamplePreds.csv"),index_col=0) for e in grp]
                 oosPreds = [pd.read_csv(Path(pathR,e,"cvPreds.csv"),index_col=0) for e in grp]
                 selectedFeats = pd.concat([pd.read_csv(Path(pathR,e,"selectedFeats.csv"),index_col=0)for e in grp] ,axis=1)
                 lfPreds = late_fusion_combination_normal(y,oosPreds,isPreds)
-                lfScores = simpleScores(y,lfPreds,selectedFeats,taskType)
-                featCount = selectedFeats.sum(axis=1).T
+                tts = time.time()
+                lfScores = simpleScores(lfPreds,y,selectedFeats,taskType)
+                print(time.time()-tts)
+                featCount = selectedFeats.sum(axis=0).T.sort_values(ascending=False)
                 pathLF = Path(pathR,f"lf_{grp[0]}")
-                p = dict(existingParams[grp[0]])
+                p = dict(existingParams[int(grp[0])])
                 p["dataset"] = "LateFusion"
                 os.makedirs(pathLF,exist_ok=True)
                 featCount.to_csv(Path(pathLF,"featCount.csv"))
@@ -131,25 +159,6 @@ def run_end(paramsFile: str,
                     plot_roc(y,lfPreds.median(axis=1),show_fig=False,path=Path(pathLF,"ROC.png"),export_file=True)  
                     boxplot_binary_predictions(y,lfPreds.median(axis=1),show_fig=False,path=Path(pathLF,"predBoxplot.png"),export_file=True)
 
-            for grp in lfGroupsSTABL:
-                selectedFeats = pd.concat([pd.read_csv(Path(pathR,e,"selectedFeats.csv"),index_col=0)for e in grp] ,axis=1)
-                prd = pd.read_csv(Path(pathR,grp[0],"cvPreds.csv"),index_col=0)
-                splits = [[np.argwhere(prd[col].isna()),np.argwhere(~prd[col].isna())] for col in prd.columns]
-                lfPreds = late_fusion_combination_stabl(data,y,selectedFeats,splits,taskType)
-                featCount = selectedFeats.sum(axis=1).T
-                pathLF = Path(pathR,f"lf_{grp[0]}")
-                p = dict(existingParams[grp[0]])
-                p["dataset"] = "LateFusion"
-                os.makedirs(pathLF,exist_ok=True)
-                featCount.to_csv(Path(pathLF,"featCount.csv"))
-                lfScores.to_csv(Path(pathLF,"cvScores.csv"))
-                lfPreds.to_csv(Path(pathLF,"cvPreds.csv"))
-                write_json(p,Path(pathLF,"params.json"))
-                lfScores.columns = [f"{p["model"]}_{grp[0]}_{intensity}_lf" ]
-                scores = pd.concat((scores,lfScores),axis=1)
-                if taskType == "binary":
-                    plot_roc(y,lfPreds.median(axis=1),show_fig=False,path=Path(pathLF,"ROC.png"),export_file=True)  
-                    boxplot_binary_predictions(y,lfPreds.median(axis=1),show_fig=False,path=Path(pathLF,"predBoxplot.png"),export_file=True)
-
-    scores.T.to_csv("./results/cvScores.csv")
+    scores = scores.T
+    scores.sort_values(by=scores.columns[0],ascending=False).to_csv("./results/cvScores.csv")
     return 
