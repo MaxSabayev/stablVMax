@@ -16,7 +16,7 @@ defaultScript = """#!/usr/bin/bash
 #SBATCH --time=48:00:00
 #SBATCH -p normal
 #SBATCH -c COUNT
-#SBATCH --mem=8GB
+#SBATCH --mem=MEMOGB
 
 ml python/3.12.1
 time python3 ./sendOut.py 0 ${SLURM_ARRAY_TASK_ID} V"""
@@ -33,7 +33,7 @@ endScript = """#!/usr/bin/bash
 ml python/3.12.1
 time python3 ./sendOut.py 1"""
 
-def parse_params(paramsFile: str)->None:
+def parse_params(paramsFile: str,highMem: bool = False)->None:
     params = read_json(paramsFile)
     paramList = unroll_parameters(params)
     os.makedirs("./temp/", exist_ok=True)
@@ -53,7 +53,11 @@ def parse_params(paramsFile: str)->None:
 
 
     script = re.sub("NAME",params["Experiment_Name"],defaultScript)
-
+    if highMem:
+        script = re.sub("MEMO","16",script)
+    else:
+        script = re.sub("MEMO","8",script)
+    
     if lowCount != 0:
         os.makedirs("./results/l/", exist_ok=True)
         with open('./temp/arrayLow.sh', 'w') as file:
@@ -95,7 +99,7 @@ def run_end(paramsFile: str,
         for exp in os.listdir(pathR):
             if os.path.exists(Path(pathR,exp,"cvScores.csv")):
                 existingParams.append(read_json(Path(pathR,exp,"params.json")))
-                sc = pd.read_csv(Path(pathR,exp,"cvScores.csv"),index_col=0,names=[f"{existingParams[-1]["model"]}_{exp}_{intensity}"],header=1)
+                sc = pd.read_csv(Path(pathR,exp,"cvScores.csv"),index_col=0,names=[f"{existingParams[-1]["model"]}_{exp}_{intensity}"],header=0)
                 if scores is None:
                     scores = sc
                 else:
@@ -107,14 +111,14 @@ def run_end(paramsFile: str,
             lfGroups = np.array([np.argwhere(lfGroupTags == i).flatten() for i in np.unique(lfGroupTags)])
             lfGroupsSTABL = [[existingParams[ee]["shorthand"].split("_")[0] for ee in e if existingParams[ee]["dataset"] != "EarlyFusion" and "stabl" in existingParams[ee]["model"]] for e in lfGroups]
             lfGroupsNonSTABL = [[existingParams[ee]["shorthand"].split("_")[0] for ee in e if existingParams[ee]["dataset"] != "EarlyFusion" and "stabl" not in existingParams[ee]["model"]] for e in lfGroups]
-            lfGroupsSTABL = [e for e in lfGroupsSTABL if len(e) > 1]
-            lfGroupsNonSTABL = [e for e in lfGroupsNonSTABL if len(e) > 1]
+            lfGroupsSTABL = [np.sort(e) for e in lfGroupsSTABL if len(e) > 1]
+            lfGroupsNonSTABL = [np.sort(e) for e in lfGroupsNonSTABL if len(e) > 1]
 
             for grp in lfGroupsSTABL:
                 print(grp)
                 selectedFeats = pd.concat([pd.read_csv(Path(pathR,e,"selectedFeats.csv"),index_col=0)for e in grp] ,axis=1)
                 prd = pd.read_csv(Path(pathR,grp[0],"cvPreds.csv"),index_col=0)
-                splits = [[np.argwhere(prd[col].isna()).flatten(),np.argwhere(prd[col].isna()).flatten()] for col in prd.columns]
+                splits = [[np.argwhere(prd[col].isna()).flatten(),np.argwhere(~prd[col].isna()).flatten()] for col in prd.columns]
                 lfPreds = late_fusion_combination_stabl(data,y,selectedFeats,splits,taskType)
                 tts = time.time()
                 lfScores = simpleScores(lfPreds,y,selectedFeats,taskType)
