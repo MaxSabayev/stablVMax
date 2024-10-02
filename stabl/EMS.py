@@ -87,18 +87,17 @@ def unroll_parameters(params: dict) -> list:
     
     num = len(params["datasets"])
     lfTag = 0
-    if num > 1:
-        experimentsFull = []
-        for exp in experiments:
-            cvSeed = np.random.randint(2**32-1)
-            for i in range(num):
-                newExp = copy.deepcopy(exp)
-                newExp["dataset"] = params["datasets"][i]
-                newExp["cvSeed"] = cvSeed
-                newExp["lfTag"] = lfTag
-                experimentsFull.append(newExp)
-            lfTag += 1
-        experiments = experimentsFull
+    experimentsFull = []
+    for exp in experiments:
+        cvSeed = np.random.randint(2**32-1)
+        for i in range(num):
+            newExp = copy.deepcopy(exp)
+            newExp["dataset"] = params["datasets"][i]
+            newExp["cvSeed"] = cvSeed
+            newExp["lfTag"] = lfTag
+            experimentsFull.append(newExp)
+        lfTag += 1
+    experiments = experimentsFull
     
     h = 0
     l = 0
