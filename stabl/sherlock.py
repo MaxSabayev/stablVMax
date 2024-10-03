@@ -99,7 +99,7 @@ def run_end(paramsFile: str,
         for exp in os.listdir(pathR):
             if os.path.exists(Path(pathR,exp,"cvScores.csv")):
                 existingParams.append(read_json(Path(pathR,exp,"params.json")))
-                sc = pd.read_csv(Path(pathR,exp,"cvScores.csv"),index_col=0,names=[f"{existingParams[-1]["model"]}_{exp}_{intensity}"],header=0,dtype=float)
+                sc = pd.read_csv(Path(pathR,exp,"cvScores.csv"),index_col=0,names=[f"{existingParams[-1]["model"]}_{exp}_{intensity}"],header=0)
                 if scores is None:
                     scores = sc
                 else:
@@ -141,8 +141,8 @@ def run_end(paramsFile: str,
 
             for grp in lfGroupsNonSTABL:
                 print(grp)
-                isPreds = [pd.read_csv(Path(pathR,e,"insamplePreds.csv"),index_col=0,dtype=float) for e in grp]
-                oosPreds = [pd.read_csv(Path(pathR,e,"cvPreds.csv"),index_col=0,dtype=float) for e in grp]
+                isPreds = [pd.read_csv(Path(pathR,e,"insamplePreds.csv"),index_col=0) for e in grp]
+                oosPreds = [pd.read_csv(Path(pathR,e,"cvPreds.csv"),index_col=0) for e in grp]
                 selectedFeats = pd.concat([pd.read_csv(Path(pathR,e,"selectedFeats.csv"),index_col=0)for e in grp] ,axis=1)
                 lfPreds = late_fusion_combination_normal(y,oosPreds,isPreds)
                 tts = time.time()
@@ -164,5 +164,6 @@ def run_end(paramsFile: str,
                     boxplot_binary_predictions(y,lfPreds.median(axis=1),show_fig=False,path=Path(pathLF,"predBoxplot.png"),export_file=True)
 
     scores = scores.T
+    scores = scores.astype(float)
     scores.sort_values(by=scores.columns[0],ascending=False).to_csv("./results/cvScores.csv")
     return 
