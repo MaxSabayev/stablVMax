@@ -193,7 +193,7 @@ def save_single_omic_results(y,results,savePath,taskType):
             stablFeats = None
             insamplePredictions = None
     preds.to_csv(Path(savePath,"cvPreds.csv"))
-    selectedFeats.to_csv(Path(savePath,"selectedFeats.csv"))
+    selectedFeats.astype(int).to_csv(Path(savePath,"selectedFeats.csv"))
     if bestParams is not None:
         pd.DataFrame(bestParams).to_csv(Path(savePath,"bestParams.csv"))
     if insamplePredictions is not None:
