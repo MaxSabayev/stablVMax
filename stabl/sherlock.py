@@ -143,7 +143,7 @@ def run_end(paramsFile: str,
                 print(grp)
                 isPreds = [pd.read_csv(Path(pathR,e,"insamplePreds.csv"),index_col=0) for e in grp]
                 oosPreds = [pd.read_csv(Path(pathR,e,"cvPreds.csv"),index_col=0) for e in grp]
-                selectedFeats = pd.concat([pd.read_csv(Path(pathR,e,"selectedFeats.csv").astype(bool),index_col=0)for e in grp] ,axis=1)
+                selectedFeats = pd.concat([pd.read_csv(Path(pathR,e,"selectedFeats.csv"),index_col=0).astype(bool) for e in grp] ,axis=1)
                 lfPreds = late_fusion_combination_normal(y,oosPreds,isPreds)
                 tts = time.time()
                 lfScores = simpleScores(lfPreds,y,selectedFeats,taskType)
