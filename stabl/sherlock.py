@@ -108,7 +108,7 @@ def run_end(paramsFile: str,
 
         if lf:
             lfGroupTags = np.array([e["lfTag"] for e in existingParams])
-            lfGroups = np.array([np.argwhere(lfGroupTags == i).flatten() for i in np.unique(lfGroupTags)])
+            lfGroups = [np.argwhere(lfGroupTags == i).flatten() for i in np.unique(lfGroupTags)]
             lfGroupsSTABL = [[existingParams[ee]["shorthand"].split("_")[0] for ee in e if existingParams[ee]["dataset"] != "EarlyFusion" and "stabl" in existingParams[ee]["model"]] for e in lfGroups]
             lfGroupsNonSTABL = [[existingParams[ee]["shorthand"].split("_")[0] for ee in e if existingParams[ee]["dataset"] != "EarlyFusion" and "stabl" not in existingParams[ee]["model"]] for e in lfGroups]
             lfGroupsSTABL = [np.sort(e) for e in lfGroupsSTABL if len(e) > 1]
