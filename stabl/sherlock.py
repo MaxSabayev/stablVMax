@@ -54,9 +54,9 @@ def parse_params(paramsFile: str,highMem: bool = False)->None:
 
     script = re.sub("NAME",params["Experiment_Name"],defaultScript)
     if highMem:
-        script = re.sub("MEMO","16",script)
+        script = re.sub("MEMO","32",script)
     else:
-        script = re.sub("MEMO","8",script)
+        script = re.sub("MEMO","16",script)
     
     if lowCount != 0:
         os.makedirs("./results/l/", exist_ok=True)
