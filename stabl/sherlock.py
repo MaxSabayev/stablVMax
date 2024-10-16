@@ -111,28 +111,28 @@ def run_end(paramsFile: str,
             lfGroups = [np.argwhere(lfGroupTags == i).flatten() for i in np.unique(lfGroupTags)]
             lfGroupsSTABL = [[existingParams[ee]["shorthand"].split("_")[0] for ee in e if existingParams[ee]["dataset"] != "EarlyFusion" and "stabl" in existingParams[ee]["model"]] for e in lfGroups]
             lfGroupsNonSTABL = [[existingParams[ee]["shorthand"].split("_")[0] for ee in e if existingParams[ee]["dataset"] != "EarlyFusion" and "stabl" not in existingParams[ee]["model"]] for e in lfGroups]
-            lfGroupsSTABL = [np.sort(e) for e in lfGroupsSTABL if len(e) > 1]
-            lfGroupsNonSTABL = [np.sort(e) for e in lfGroupsNonSTABL if len(e) > 1]
+            lfGroupsSTABL = [np.sort(np.array(e).astype(int)) for e in lfGroupsSTABL if len(e) > 1]
+            lfGroupsNonSTABL = [np.sort(np.array(e).astype(int)) for e in lfGroupsNonSTABL if len(e) > 1]
 
             for grp in lfGroupsSTABL:
                 print(grp)
-                selectedFeats = pd.concat([pd.read_csv(Path(pathR,e,"selectedFeats.csv"),index_col=0).astype(bool)for e in grp] ,axis=1)
-                prd = pd.read_csv(Path(pathR,grp[0],"cvPreds.csv"),index_col=0)
+                selectedFeats = pd.concat([pd.read_csv(Path(pathR,str(e),"selectedFeats.csv"),index_col=0).astype(bool)for e in grp] ,axis=1)
+                prd = pd.read_csv(Path(pathR,str(grp[0]),"cvPreds.csv"),index_col=0)
                 splits = [[np.argwhere(prd[col].isna()).flatten(),np.argwhere(~prd[col].isna()).flatten()] for col in prd.columns]
                 lfPreds = late_fusion_combination_stabl(data,y,selectedFeats,splits,taskType)
                 tts = time.time()
                 lfScores = simpleScores(lfPreds,y,selectedFeats,taskType)
                 print(time.time()-tts)
                 featCount = selectedFeats.sum(axis=0).T.sort_values(ascending=False)
-                pathLF = Path(pathR,f"lf_{grp[0]}")
-                p = dict(existingParams[int(grp[0])])
+                pathLF = Path(pathR,f"lf_{str(grp[0])}")
+                p = read_json(Path(pathR,str(grp[0]),"params.json"))
                 p["dataset"] = "LateFusion"
                 os.makedirs(pathLF,exist_ok=True)
                 featCount.to_csv(Path(pathLF,"featCount.csv"))
                 lfScores.to_csv(Path(pathLF,"cvScores.csv"))
                 lfPreds.to_csv(Path(pathLF,"cvPreds.csv"))
                 write_json(p,Path(pathLF,"params.json"))
-                lfScores.columns = [f"{p["model"]}_{grp[0]}_{intensity}_lf" ]
+                lfScores.columns = [f"{p["model"]}_{str(grp[0])}_{intensity}_lf" ]
                 scores = pd.concat((scores,lfScores),axis=1)
                 if taskType == "binary":
                     plot_roc(y,lfPreds.median(axis=1),show_fig=False,path=Path(pathLF,"ROC.png"),export_file=True)  
@@ -141,23 +141,23 @@ def run_end(paramsFile: str,
 
             for grp in lfGroupsNonSTABL:
                 print(grp)
-                isPreds = [pd.read_csv(Path(pathR,e,"insamplePreds.csv"),index_col=0) for e in grp]
-                oosPreds = [pd.read_csv(Path(pathR,e,"cvPreds.csv"),index_col=0) for e in grp]
-                selectedFeats = pd.concat([pd.read_csv(Path(pathR,e,"selectedFeats.csv"),index_col=0).astype(bool) for e in grp] ,axis=1)
+                isPreds = [pd.read_csv(Path(pathR,str(e),"insamplePreds.csv"),index_col=0) for e in grp]
+                oosPreds = [pd.read_csv(Path(pathR,str(e),"cvPreds.csv"),index_col=0) for e in grp]
+                selectedFeats = pd.concat([pd.read_csv(Path(pathR,str(e),"selectedFeats.csv"),index_col=0).astype(bool) for e in grp] ,axis=1)
                 lfPreds = late_fusion_combination_normal(y,oosPreds,isPreds)
                 tts = time.time()
                 lfScores = simpleScores(lfPreds,y,selectedFeats,taskType)
                 print(time.time()-tts)
                 featCount = selectedFeats.sum(axis=0).T.sort_values(ascending=False)
-                pathLF = Path(pathR,f"lf_{grp[0]}")
-                p = dict(existingParams[int(grp[0])])
+                pathLF = Path(pathR,f"lf_{str(grp[0])}")
+                p = read_json(Path(pathR,str(grp[0]),"params.json"))
                 p["dataset"] = "LateFusion"
                 os.makedirs(pathLF,exist_ok=True)
                 featCount.to_csv(Path(pathLF,"featCount.csv"))
                 lfScores.to_csv(Path(pathLF,"cvScores.csv"))
                 lfPreds.to_csv(Path(pathLF,"cvPreds.csv"))
                 write_json(p,Path(pathLF,"params.json"))
-                lfScores.columns = [f"{p["model"]}_{grp[0]}_{intensity}_lf" ]
+                lfScores.columns = [f"{p["model"]}_{str(grp[0])}_{intensity}_lf"]
                 scores = pd.concat((scores,lfScores),axis=1)
                 if taskType == "binary":
                     plot_roc(y,lfPreds.median(axis=1),show_fig=False,path=Path(pathLF,"ROC.png"),export_file=True)  
