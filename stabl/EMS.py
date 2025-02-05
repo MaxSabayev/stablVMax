@@ -158,12 +158,13 @@ def generateModel(paramSet: dict):
                     sample_fraction=paramSet["sampleFractions"],
                     random_state=seed,
                     lambda_grid=lambdaGrid,
+                    n_jobs=paramSet["n_jobs"],
                     verbose=1
                 )
     else:
         chosen_inner_cv = RepeatedStratifiedKFold(n_splits=paramSet["innerCVvals"][0],n_repeats=paramSet["innerCVvals"][1], random_state=seed)
         model = GridSearchCV(submodel, param_grid=lambdaGrid, 
-                             scoring="roc_auc", cv=chosen_inner_cv, n_jobs=-1)
+                             scoring="roc_auc", cv=chosen_inner_cv, n_jobs=paramSet["n_jobs"])
     
     return preprocessing,model
 
