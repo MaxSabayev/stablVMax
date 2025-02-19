@@ -26,8 +26,32 @@ def jaccard_similarity(list1, list2):
 
     return float(intersection) / union
 
+def jaccard_similarity_bool(list1, list2):
+    """
+    Function to compute the jaccard similarity between two list of same size of booleans
+    Parameters
+    ----------
+    list1: array-like
+        First list of booleans
 
-def jaccard_matrix(list_of_lists, remove_diag=True):
+    list2: array-like
+        Second list of booleans
+
+    Returns
+    -------
+    Jaccard similarity between the two lists.
+    """
+
+    intersection = np.sum(list1 & list2)
+    union = np.sum(list1 | list2)
+
+    if (intersection == 0) and (union == 0):
+        return 0
+
+    return float(intersection) / union
+
+
+def jaccard_matrix(list_of_lists, remove_diag=True,boolean = True):
     """
     Function to compute the jaccard matrix from a list of lists.
     Jaccard_Matrix[i, j] = jaccard_similarity(list_of_lists[i], list_of_lists[j])
@@ -45,12 +69,18 @@ def jaccard_matrix(list_of_lists, remove_diag=True):
     jaccard_matrix: array-like, size=(len(list_of_lists), len(list_of_lists))
     """
 
+    if boolean:
+        f = jaccard_similarity_bool
+    else:
+        f = jaccard_similarity
     N = len(list_of_lists)
     jaccard_mat = np.zeros((N, N))
 
     for i in range(N):
-        for j in range(N):
-            jaccard_mat[i, j] = jaccard_similarity(list_of_lists[i], list_of_lists[j])
+        for j in range(i,N):
+            v= f(list_of_lists.iloc[i,:], list_of_lists.iloc[j,:])
+            jaccard_mat[i, j] = v
+            jaccard_mat[j, i] = v
 
     if remove_diag:
         jaccard_mat = jaccard_mat[~np.eye(jaccard_mat.shape[0], dtype=bool)].reshape(

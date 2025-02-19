@@ -101,7 +101,7 @@ def plot_roc(
     lgd = plt.legend(bbox_to_anchor=(0, 1.02, 1, 0.2), loc="lower center", fontsize=8)
 
     if export_file:
-        fig.savefig(path, dpi=95, bbox_extra_artists=(lgd,), bbox_inches='tight')
+        fig.savefig(path, dpi=300, bbox_extra_artists=(lgd,), bbox_inches='tight')
 
     if not show_fig:
         plt.close()
@@ -494,6 +494,8 @@ def boxplot_binary_predictions(
         color='.9',
         showfliers=False,
         palette=palette,
+        hue= y_true,
+        legend=False,
         boxprops=dict(alpha=.25),
         width=.5
     )
@@ -510,9 +512,9 @@ def boxplot_binary_predictions(
     pr_ci_lo, pr_ci_up = compute_CI(y_true, y_preds, scoring="prc_auc")
 
     plt.title(
-        fr"$\bf{{Mannwhitney}}$ pvalue={utest.pvalue:.2e}" + '\n'
-        fr"$\bf{{AUROC}}$={roc_auc:.2f} [{auc_ci_lo:.2f}, {auc_ci_up:.2f}]" + '\n'
-        fr"$\bf{{AUPRC}}$={pr_auc:.2f} [{pr_ci_lo:.2f}, {pr_ci_up:.2f}]",
+        fr"$\bf{{Mann-Whitney}}$ p-value={utest.pvalue:.3e}" + '\n'
+        fr"$\bf{{AUROC}}$={roc_auc:.3f} [{auc_ci_lo:.3f}, {auc_ci_up:.3f}]" + '\n'
+        fr"$\bf{{AUPRC}}$={pr_auc:.3f} [{pr_ci_lo:.3f}, {pr_ci_up:.3f}]",
         fontsize=10
     )
     plt.xlabel(x_axis_title)
@@ -522,7 +524,7 @@ def boxplot_binary_predictions(
 
     plt.tight_layout()
     if export_file:
-        fig.savefig(path, dpi=95, bbox_inches="tight")
+        fig.savefig(path, dpi=300, bbox_inches="tight")
 
     if not show_fig:
         plt.close()

@@ -1,0 +1,55 @@
+{
+    "Experiment_Name": "AP_Traj",
+    "datasets" : ["IL18", "IL246", "LPS", "Unstim","EarlyFusion"],
+    "models": {
+        "lasso" : true,
+        "alasso" : true,
+        "en" : true,
+        "stabl_lasso" : true,
+        "stabl_alasso" : true,
+        "stabl_en" : true
+    },
+    "general" :{ 
+        "varType" : "thresh",
+        "innerCVvals" : [5,5],
+        "max_iter" : 1000000,
+        "useRandomSeed" : true,
+        "seedValue": 42,
+        "n_jobs" : -1,
+        "n_jobs_nonstabl": 1
+    },
+    "preprocessing" : {
+        "varValues": [0,0.01,0.1],
+        "lifThresh" : [0.2]
+    },
+    "stabl_general": {
+        "n_bootstraps" : [5000],
+        "replace" : [true],
+        "artificialTypes" : ["random_permutation","knockoff"],
+        "artificialProportions" : [1.0],
+        "sampleFractions": [1.0],
+        "fdrThreshParams": [[0.01,1.0,0.01]]
+    },
+    "lasso" :  {
+        "hyperparameters" : {"C" : {"type" : "log", "val" : [-2,2,30]}}
+    },
+    "alasso" : {
+        "hyperparameters" : {"C" : {"type" : "log", "val" : [-2,2,30]}}
+    },
+    "en": { 
+        "hyperparameters" : {"C" : {"type" : "log", "val" : [-2,1,5]},
+                             "l1_ratio": {"type" : "lin", "val" : [0.3,0.7,3]}},
+        "max_iter" : 10000
+    },
+    "stabl_lasso": {
+        "hyperparameters" : {"C" : {"type" : "log", "val" : [-2,1,10]}}
+    },
+    "stabl_alasso": {
+        "hyperparameters" : {"C" : {"type" : "log", "val" : [-2,1,10]}}
+    },
+    "stabl_en": {
+        "hyperparameters" : {"C" : {"type" : "log", "val" : [-2,1,5]},
+                             "l1_ratio": {"type" : "lin", "val" : [0.3,0.7,3]}},
+        "max_iter" : 10000
+    }
+}
