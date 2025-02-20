@@ -164,7 +164,7 @@ def generateModel(paramSet: dict):
     else:
         chosen_inner_cv = RepeatedStratifiedKFold(n_splits=paramSet["innerCVvals"][0],n_repeats=paramSet["innerCVvals"][1], random_state=seed)
         model = GridSearchCV(submodel, param_grid=lambdaGrid, 
-                             scoring="roc_auc", cv=chosen_inner_cv, n_jobs=1)
+                             scoring="roc_auc", cv=chosen_inner_cv, n_jobs=paramSet["n_jobs_nonstabl"])
     
     return preprocessing,model
 
