@@ -250,10 +250,10 @@ def late_fusion_combination_stabl(
         for each omic, the list of selected features over each of the folds of the crosvalidation
     """
     predictions = pd.DataFrame(index=y.index, columns=selected_features.index,dtype=float)
+
     for k in range(len(splits)):
         trainIdx, testIdx = splits[k]
         fold_selected_features = np.argwhere(selected_features.iloc[k,:]).flatten()
-
         X_train = data.iloc[trainIdx,fold_selected_features]
         X_test = data.iloc[testIdx,fold_selected_features]
         y_train = y.iloc[trainIdx]

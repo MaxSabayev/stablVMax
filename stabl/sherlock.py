@@ -118,6 +118,7 @@ def run_end(paramsFile: str,
                 print(grp)
                 selectedFeats = pd.concat([pd.read_csv(Path(pathR,str(e),"selectedFeats.csv"),index_col=0).astype(bool)for e in grp] ,axis=1)
                 prd = pd.read_csv(Path(pathR,str(grp[0]),"cvPreds.csv"),index_col=0)
+                prd = prd.loc[data.index]
                 splits = [[np.argwhere(prd[col].isna()).flatten(),np.argwhere(~prd[col].isna()).flatten()] for col in prd.columns]
                 lfPreds = late_fusion_combination_stabl(data,y,selectedFeats,splits,taskType)
                 tts = time.time()
@@ -143,7 +144,7 @@ def run_end(paramsFile: str,
                 print(grp)
                 isPreds = [pd.read_csv(Path(pathR,str(e),"insamplePreds.csv"),index_col=0) for e in grp]
                 oosPreds = [pd.read_csv(Path(pathR,str(e),"cvPreds.csv"),index_col=0) for e in grp]
-                selectedFeats = pd.concat([pd.read_csv(Path(pathR,str(e),"selectedFeats.csv"),index_col=0).astype(bool) for e in grp] ,axis=1)
+                selectedFeats = pd.concat([pd.read_csv(Path(pathR,str(e),"selectedFeats.csv"),index_col=0).astype(bool) for e in grp] ,axis=1) 
                 lfPreds = late_fusion_combination_normal(y,oosPreds,isPreds)
                 tts = time.time()
                 lfScores = simpleScores(lfPreds,y,selectedFeats,taskType)
