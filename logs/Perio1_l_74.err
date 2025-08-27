@@ -1,0 +1,6 @@
+/home/users/jeinhaus/.local/lib/python3.12/site-packages/sklearn/svm/_base.py:1237: ConvergenceWarning: Liblinear failed to converge, increase the number of iterations.
+  warnings.warn(
+
+real	192m47.417s
+user	1286m43.497s
+sys	5m57.365s

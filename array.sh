@@ -8,4 +8,3 @@ fi
 wait
 sbatch -W ./temp/end.sh
 echo "All done!"
-

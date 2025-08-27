@@ -10,8 +10,17 @@ import argparse
 import os 
 
 
-df= pd.read_csv(f"../../data/dataAP.csv",index_col=0)
-y =  pd.read_csv(f"../../data/outcomeAP.csv",index_col=0,dtype=int).Group
+frequencies= pd.read_csv(f"/home/users/jeinhaus/Perio/AnalysisPerio1/Data/PerioPhase1_frequencies_BL.csv",index_col=0)
+frequencies.columns = [col + "_frequency" for col in frequencies.columns]
+Pgingivalis = pd.read_csv(f"/home/users/jeinhaus/Perio/AnalysisPerio1/Data/PerioPhase1_functional_BL_Pgingivalis.csv",index_col=0)
+Cocktail = pd.read_csv(f"/home/users/jeinhaus/Perio/AnalysisPerio1/Data/PerioPhase1_functional_BL_Cocktail.csv",index_col=0)
+IFNa = pd.read_csv(f"/home/users/jeinhaus/Perio/AnalysisPerio1/Data/PerioPhase1_functional_BL_IFNa.csv",index_col=0)
+TNFa = pd.read_csv(f"/home/users/jeinhaus/Perio/AnalysisPerio1/Data/PerioPhase1_functional_BL_TNFa.csv",index_col=0)
+Unstim = pd.read_csv(f"/home/users/jeinhaus/Perio/AnalysisPerio1/Data/PerioPhase1_functional_BL_Unstim.csv",index_col=0)
+
+df = pd.concat([Pgingivalis, Cocktail, IFNa, TNFa, Unstim, frequencies], axis=1)
+df_outcome = pd.read_csv("/home/users/jeinhaus/Perio/AnalysisPerio1/Outcome/Perio1_outcome.csv", index_col=0)
+y = df_outcome["Group"]
 taskType = 'binary'
 
 orderby = "ROC AUC" if taskType == "binary" else "R2"

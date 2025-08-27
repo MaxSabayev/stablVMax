@@ -1,13 +1,13 @@
 {
-    "Experiment_Name": "AP_Traj",
-    "datasets" : ["IL18", "IL246", "LPS", "Unstim","EarlyFusion"],
+    "Experiment_Name": "Perio1",
+    "datasets" : ["Cocktail", "Pgingivalis", "IFNa", "TNFa", "Unstim", "frequency", "EarlyFusion"],
     "models": {
-        "lasso" : true,
-        "alasso" : true,
-        "en" : true,
+        "lasso" : false,
+        "alasso" : false,
+        "en" : false,
         "stabl_lasso" : true,
         "stabl_alasso" : true,
-        "stabl_en" : true
+        "stabl_en" : false
     },
     "general" :{ 
         "varType" : "thresh",

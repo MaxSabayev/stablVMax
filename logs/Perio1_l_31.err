@@ -1,0 +1,46 @@
+Traceback (most recent call last):
+  File "/home/users/jeinhaus/Perio/stablVMax/./sendOut.py", line 89, in <module>
+    experiment(read_json(Path(path,"params.json")),args.idx,path)
+  File "/home/users/jeinhaus/Perio/stablVMax/./sendOut.py", line 48, in experiment
+    results = single_omic_simple(
+              ^^^^^^^^^^^^^^^^^^^
+  File "/home/users/jeinhaus/.local/lib/python3.12/site-packages/sklearn/utils/_testing.py", line 158, in wrapper
+    return fn(*args, **kwargs)
+           ^^^^^^^^^^^^^^^^^^^
+  File "/home/users/jeinhaus/Perio/stablVMax/stabl/single_omic.py", line 116, in single_omic_simple
+    X_train_std = fromPreprocessing(X_train,preprocessing)
+                  ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "/home/users/jeinhaus/Perio/stablVMax/stabl/single_omic.py", line 30, in <lambda>
+    fromPreprocessing = lambda data,prepro: pd.DataFrame(data=prepro.fit_transform(data),index=data.index,columns=prepro.get_feature_names_out())
+                                                              ^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "/home/users/jeinhaus/.local/lib/python3.12/site-packages/sklearn/base.py", line 1474, in wrapper
+    return fit_method(estimator, *args, **kwargs)
+           ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "/home/users/jeinhaus/.local/lib/python3.12/site-packages/sklearn/pipeline.py", line 535, in fit_transform
+    Xt = self._fit(X, y, routed_params)
+         ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "/home/users/jeinhaus/.local/lib/python3.12/site-packages/sklearn/pipeline.py", line 408, in _fit
+    X, fitted_transformer = fit_transform_one_cached(
+                            ^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "/home/users/jeinhaus/.local/lib/python3.12/site-packages/joblib/memory.py", line 312, in __call__
+    return self.func(*args, **kwargs)
+           ^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "/home/users/jeinhaus/.local/lib/python3.12/site-packages/sklearn/pipeline.py", line 1303, in _fit_transform_one
+    res = transformer.fit_transform(X, y, **params.get("fit_transform", {}))
+          ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "/home/users/jeinhaus/.local/lib/python3.12/site-packages/sklearn/utils/_set_output.py", line 295, in wrapped
+    data_to_wrap = f(self, X, *args, **kwargs)
+                   ^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "/home/users/jeinhaus/.local/lib/python3.12/site-packages/sklearn/base.py", line 1098, in fit_transform
+    return self.fit(X, **fit_params).transform(X)
+           ^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "/home/users/jeinhaus/.local/lib/python3.12/site-packages/sklearn/base.py", line 1474, in wrapper
+    return fit_method(estimator, *args, **kwargs)
+           ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "/home/users/jeinhaus/.local/lib/python3.12/site-packages/sklearn/feature_selection/_variance_threshold.py", line 126, in fit
+    raise ValueError(msg.format(self.threshold))
+ValueError: No feature in X meets the variance threshold 0.10000
+
+real	9m27.475s
+user	27m44.505s
+sys	0m9.643s

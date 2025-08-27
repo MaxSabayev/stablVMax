@@ -16,7 +16,7 @@ setuptools.setup(
         'numpy>=1.26.2',
         'matplotlib>=3.8.2',
         "knockpy>=1.3.1",
-        "scikit-learn>=1.3.2",
+        "scikit-learn==1.4.2",
         "seaborn>=0.13.0",
         "pandas>=2.1.4",
         "statsmodels>=0.14.0",
