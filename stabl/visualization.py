@@ -13,7 +13,7 @@ from sklearn.model_selection import cross_val_predict, LeaveOneOut, StratifiedKF
 from sklearn.preprocessing import LabelBinarizer
 from sklearn.linear_model import LinearRegression
 
-from utils import compute_CI
+from .utils import compute_CI
 
 colors = ['#a8e6ce', '#dcedc2', '#ffd3b5', '#ffaaa6',
           '#ff8c94', '#e3819d', '#a188b7', '#487fad']
