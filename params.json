@@ -7,16 +7,24 @@
         "en" : true,
         "stabl_lasso" : true,
         "stabl_alasso" : true,
-        "stabl_en" : true
+        "stabl_en" : true,
+        "stabl_randomForest" : true,
+        "stabl_xgboost" : true
     },
-    "general" :{ 
+    "general" :{
+        "taskType" : "binary",
         "varType" : "thresh",
         "innerCVvals" : [5,5],
         "max_iter" : 1000000,
+        "useScoring" : false,
         "useRandomSeed" : true,
-        "seedValue": 42,
+        "setSeedValue": 42,
         "n_jobs" : -1,
-        "n_jobs_nonstabl": 1
+        "n_jobs_nonstabl": 1,
+        "memLowGB" : 16,
+        "memHighGB" : 32,
+        "cpusLow" : 8,
+        "cpusHigh" : 16
     },
     "preprocessing" : {
         "varValues": [0,0.01,0.1],
@@ -51,5 +59,14 @@
         "hyperparameters" : {"C" : {"type" : "log", "val" : [-2,1,5]},
                              "l1_ratio": {"type" : "lin", "val" : [0.3,0.7,3]}},
         "max_iter" : 10000
+    },
+    "stabl_randomForest": {
+        "hyperparameters" : {"max_depth" : {"type" : "lin", "val" : [3,10,4]}},
+        "n_estimators" : 200
+    },
+    "stabl_xgboost": {
+        "hyperparameters" : {"max_depth" : {"type" : "lin", "val" : [3,9,3]},
+                             "reg_alpha" : {"type" : "log", "val" : [-2,0,5]}},
+        "n_estimators" : 200
     }
 }

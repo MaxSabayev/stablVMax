@@ -4,6 +4,7 @@ from warnings import warn
 import sys
 
 import matplotlib.pyplot as plt
+plt.switch_backend('agg')
 import numpy as np
 import pandas as pd
 from joblib import Parallel, delayed
@@ -11,7 +12,6 @@ from knockpy.knockoffs import GaussianSampler
 from sklearn.base import BaseEstimator, clone
 from sklearn.feature_selection import SelectorMixin, SelectFromModel
 from sklearn.linear_model import LogisticRegression, Lasso, ElasticNet
-from sklearn.ensemble import RandomForestClassifier, RandomForestRegressor
 from sklearn.model_selection import ParameterGrid,  GroupShuffleSplit
 from sklearn.utils import safe_mask
 from sklearn.utils.class_weight import compute_sample_weight
@@ -19,16 +19,10 @@ from sklearn.utils.validation import _check_feature_names_in, check_is_fitted
 from tqdm.autonotebook import tqdm
 from unionfind import UnionFind
 import warnings
+from adaptive import ALasso, ALogitLasso
 from utils import auto_mode_lambda_grid
 from visualization import boxplot_features, scatterplot_features
-
-# Optional imports for XGBoost
-try:
-    import xgboost as xgb
-    XGBOOST_AVAILABLE = True
-except ImportError:
-    XGBOOST_AVAILABLE = False
-    xgb = None
+from scipy.stats import rankdata
 
 
 def classic_bootstrap(y, n_subsamples, replace=True, class_weight=None, rng=np.random.default_rng(None), **kwargs):
@@ -485,55 +479,62 @@ def plot_stabl_path(
     different_params = stabl.get_different_parameters()
     nb_different_params = len(different_params)
     if nb_different_params <= 1:
-        # Only one hyperparameter, get its name and values
-        param_name = list(stabl.fitted_lambda_grid_.keys())[0]
-        param_values = np.array(stabl.fitted_lambda_grid_[param_name])
-        # Normalize for plotting: get the general trend (increasing or decreasing) by comparing first and last value
-        if np.all(param_values > 0):
-            if param_values[-1] > param_values[0]:
-                x_grid_tmp = param_values / np.max(param_values)
-            else: 
-                x_grid_tmp = np.min(param_values) / param_values
-        else:
-            x_grid_tmp = param_values
-        order_list = [np.arange(len(param_values))]
-        x_grid_list = [x_grid_tmp]
-        x_padding_list = [0]
+        if 'alpha' in stabl.fitted_lambda_grid_:
+            x_grid_tmp = np.min(stabl.fitted_lambda_grid_["alpha"]) / stabl.fitted_lambda_grid_["alpha"]
+            order_list = [np.arange(len(stabl.fitted_lambda_grid_["alpha"]))]
+            x_grid_list = [x_grid_tmp]
+            x_padding_list = [0]
+        elif 'C' in stabl.fitted_lambda_grid_:
+            x_grid_tmp = stabl.fitted_lambda_grid_["C"] / np.max(stabl.fitted_lambda_grid_["C"])
+            order_list = [np.arange(len(stabl.fitted_lambda_grid_["C"]))]
+            x_grid_list = [x_grid_tmp]
+            x_padding_list = [0]
+        elif nb_different_params == 1:
+            param = different_params[0]
+            x_grid_tmp = stabl.fitted_lambda_grid_[param] / np.max(stabl.fitted_lambda_grid_[param])
+            order_list = [np.arange(len(stabl.fitted_lambda_grid_[param]))]
+            x_grid_list = [x_grid_tmp]
+            x_padding_list = [0]
     elif nb_different_params == 2:
         params = list(ParameterGrid(stabl.fitted_lambda_grid_))
-        param_names = list(different_params)
-        # Try to find which is the "grouping" param (e.g., l1_ratio) and which is the "penalty"
-        # Heuristic: if one is named l1_ratio, use it as grouping, otherwise use the first as grouping
-        if "l1_ratio" in param_names:
-            group_param = "l1_ratio"
-            penalty_param = [p for p in param_names if p != "l1_ratio"][0]
-        else:
-            group_param = param_names[0]
-            penalty_param = param_names[1]
         ordered_params = dict()
-        for i, k in enumerate(params):
-            group_val = k[group_param]
-            penalty_val = k[penalty_param]
-            if group_val in ordered_params:
-                order = ordered_params[group_val][0]
-                x_grid = ordered_params[group_val][1]
-            else:
-                order = []
-                x_grid = []
-            order.append(i)
-            x_grid.append(penalty_val)
-            ordered_params[group_val] = (order, x_grid)
-        figsize = (figsize[0] * len(ordered_params.keys()), figsize[1])
-        x_padding = 0
-        for group_val in sorted(ordered_params.keys()):
-            order = np.array(ordered_params[group_val][0])
-            penalties = np.array(ordered_params[group_val][1])
-            # Normalize for plotting: get the general trend (increasing or decreasing) by comparing first and last value
-            if np.all(penalties > 0):
-                if penalties[-1] > penalties[0]: 
-                    x_grid = penalties / np.max(penalties)
-                else:  
-                    x_grid = np.min(penalties) / penalties
+        if "l1_ratio" in different_params and ("alpha" in different_params or "C" in different_params):
+            for i, k in enumerate(params):
+                l1_ratio = k["l1_ratio"]
+                penalty = k["alpha"] if "alpha" in k else k["C"]
+                if l1_ratio in ordered_params:
+                    order = ordered_params[l1_ratio][0]
+                    x_grid = ordered_params[l1_ratio][1]
+                else:
+                    order = []
+                    x_grid = []
+                order.append(i)
+                x_grid.append(penalty)
+                ordered_params[l1_ratio] = (order, x_grid)
+            figsize = (figsize[0] * len(ordered_params.keys()), figsize[1])
+            x_padding = 0
+        else:
+            for i, k in enumerate(params):
+                l1_ratio = k[different_params[0]]
+                penalty = k[different_params[1]]
+                if l1_ratio in ordered_params:
+                    order = ordered_params[l1_ratio][0]
+                    x_grid = ordered_params[l1_ratio][1]
+                else:
+                    order = []
+                    x_grid = []
+                order.append(i)
+                x_grid.append(penalty)
+                ordered_params[l1_ratio] = (order, x_grid)
+            figsize = (figsize[0] * len(ordered_params.keys()), figsize[1])
+            x_padding = 0
+        for l1_ratio in sorted(ordered_params.keys()):
+            order = np.array(ordered_params[l1_ratio][0])
+            penalties = np.array(ordered_params[l1_ratio][1])
+            if "alpha" in different_params:
+                x_grid = np.min(penalties) / penalties
+            elif "C" in different_params:
+                x_grid = penalties / np.max(penalties)
             else:
                 x_grid = penalties
             x_padding += np.max(x_grid) - np.min(x_grid) + 1e-5
@@ -549,7 +550,7 @@ def plot_stabl_path(
     x_list = []
 
     for i, o in enumerate(order_list):
-        x_grid = x_grid_list[i]
+        x_grid = np.float64(x_grid_list[i])
         x_padding = x_padding_list[i]
         x_grid += x_padding
         for j in x_grid:
@@ -760,86 +761,50 @@ def save_stabl_results(
         )
 
 
-def _get_feature_scores(estimator, X, scoring_attribute):
-    """
-    Extract feature scores from a fitted estimator.
-    
-    Parameters
-    ----------
-    estimator : fitted estimator
-        The fitted estimator to extract scores from
-    X : array-like, shape (n_samples, n_features)
-        Training data (used for some scoring methods)
-    scoring_attribute : str, default="weight"
-        Attribute to use for scoring: "coef_", "feature_importances_", or XGBoost importance type
+# def fit_bootstrapped_sample(
+#         base_estimator,
+#         X,
+#         y,
+#         lambda_val,
+#         corr_groups=None,
+#         threshold=None,
+#         importance_method: str = "weight"
+# ):
+#     """
+#     Version 0 — normalisation ptp
+#     """
+#     base_estimator.set_params(**lambda_val)
+#     if hasattr(base_estimator, "groups"):
+#         base_estimator.set_params(groups=corr_groups)
+#     base_estimator.fit(X, y)
+
+#     if isinstance(base_estimator, (ALasso, ALogitLasso)) \
+#             or base_estimator.__class__.__module__.startswith("sklearn.linear_model"):
+#         return SelectFromModel(base_estimator, threshold=threshold,
+#                                prefit=True).get_support()
+
+#     if importance_method == "shap":
+#         import shap
+#         explainer = shap.TreeExplainer(base_estimator)
+#         shap_vals = explainer.shap_values(X, check_additivity=False)
+#         if isinstance(shap_vals, list):
+#             shap_vals = np.stack(shap_vals).sum(axis=0)
+#         feat_imp = np.abs(shap_vals).mean(0)
+#     else:
+#         if hasattr(base_estimator, "get_booster"):
+#             booster = base_estimator.get_booster()
+#             score = booster.get_score(importance_type=importance_method)
+#             feat_imp = np.array([score.get(f"f{i}", 0.)
+#                                  for i in range(base_estimator.n_features_in_)])
+#         else:
+#             feat_imp = base_estimator.feature_importances_
+
+#     # ─── Normalisation ───────────────────────────────────────────────
+#     if np.all(feat_imp == 0):
+#         return np.zeros_like(feat_imp)
         
-    Returns
-    -------
-    scores : array-like, shape (n_features,)
-        Feature scores
-    """
-
-    if hasattr(estimator, "get_booster"):
-        booster = estimator.get_booster()
-        score_dict = booster.get_score(importance_type=scoring_attribute)
-        n_features = estimator.n_features_in_
-        scores = np.array([score_dict.get(f"f{i}", 0.0) for i in range(n_features)])
-        return scores
-    
-    # For other models (linear, tree-based)
-    else:
-        coefs = getattr(estimator, scoring_attribute, None)
-        if coefs is None:
-            return np.zeros(X.shape[1], dtype=float)
-        
-        coefs = np.asarray(coefs)
-        if coefs.ndim == 1:
-            return np.abs(coefs)
-        else:
-            # Multi-class: average absolute coefficients across classes
-            return np.mean(np.abs(coefs), axis=0)
-
-
-def _is_tree_based_model(estimator):
-    """Check if estimator is tree-based (RandomForest, XGBoost, etc.)"""
-    if XGBOOST_AVAILABLE and isinstance(estimator, (xgb.XGBClassifier, xgb.XGBRegressor)):
-        return True
-    if isinstance(estimator, (RandomForestClassifier, RandomForestRegressor)):
-        return True
-    # Check for other tree-based models by looking for feature_importances_
-    return hasattr(estimator, "feature_importances_") and not hasattr(estimator, "coef_")
-
-
-def _is_linear_model(estimator):
-    """Check if estimator is linear (has coefficients)"""
-    # Check by class type for unfitted estimators
-    if isinstance(estimator, (LogisticRegression, Lasso, ElasticNet)):
-        return True
-    # Check by attribute for fitted estimators
-    return hasattr(estimator, "coef_")
-
-def _derive_binary_selection_from_scores(scores, threshold=None):
-    """
-    Derive binary selection mask from continuous feature scores.
-    
-    Parameters
-    ----------
-    scores : array-like, shape (n_features,)
-        Continuous feature scores
-    threshold : float, optional
-        Threshold for selection. If None, uses non-zero detection.
-        
-    Returns
-    -------
-    binary_mask : array-like, shape (n_features,)
-        Boolean mask of selected features
-    """
-    if threshold is None:
-        # For linear models, non-zero coefficients indicate selection
-        return scores > 0
-    else:
-        # Use provided threshold
-        return scores > threshold
+#     range_imp = np.ptp(feat_imp)
+#     return np.zeros_like(feat_imp) if range_imp == 0 else feat_imp / range_imp
 
 
 def fit_bootstrapped_sample(
@@ -849,67 +814,109 @@ def fit_bootstrapped_sample(
         lambda_val,
         corr_groups=None,
         threshold=None,
-        use_scoring=False,
-        scoring_attribute = None
+        importance_method: str = "weight"
 ):
     """
-    Fits base_estimator on a bootstrap sample of the original data,
-    and returns either binary selection or continuous feature scores.
-
-    Parameters
-    ----------
-    base_estimator: estimator
-        This is the estimator to be fitted on the data
-
-    X: {array-like, sparse matrix}, shape = [n_repeats, n_features]
-        The training input samples.
-
-    y: array-like, shape = [n_repeats]
-        The target values.
-
-    lambda_val: dict of parameters
-        Penalization parameters of base_estimator
-
-    corr_groups: array-like, default=None
-        Groups of features based on the correlation matrix. It is used for sparse group lasso.
-
-    threshold: string or float, default=None
-        The hard_threshold value to use for feature selection. Features whose
-        importance is greater or equal are kept while the others are
-        discarded. If "median" (resp. "mean"), then the ``hard_threshold`` value is
-        the median (resp. the mean) of the feature importance. A scaling
-        factor (e.g., "1.25*mean") may also be used. If None and if the
-        estimator has a parameter penalty set to l1, either explicitly
-        or implicitly (e.g, Lasso), the hard_threshold used is 1e-5.
-        Otherwise, "mean" is used by default.
-
-    use_scoring: bool, default=True
-        For linear models: if True, return continuous coefficients; if False, return binary selection.
-        For tree-based models: always True (required).
-
-
-    Returns
-    -------
-    result: array-like, shape=(n_features, )
-        If use_scoring=True: Continuous feature scores
-        If use_scoring=False: Boolean mask of selected variables
+    Version 0 — normalisation ptp (linéaires traités comme XGB : importances continues via |coef|).
     """
     base_estimator.set_params(**lambda_val)
     if hasattr(base_estimator, "groups"):
         base_estimator.set_params(groups=corr_groups)
     base_estimator.fit(X, y)
 
-    if use_scoring:
-        # Return continuous feature scores
-        return _get_feature_scores(base_estimator, X, scoring_attribute=scoring_attribute)
+    # ─── Branche linéaire : on calcule une importance continue |coef|, moyennée si multiclasses ───
+    if isinstance(base_estimator, (ALasso, ALogitLasso)) \
+            or base_estimator.__class__.__module__.startswith("sklearn.linear_model"):
+        coefs = getattr(base_estimator, "coef_", None)
+        if coefs is None:
+            # fallback éventuel si l'estimateur expose feature_importances_
+            feat_imp = getattr(base_estimator, "feature_importances_", None)
+            if feat_imp is None:
+                return np.zeros(X.shape[1], dtype=float)
+        else:
+            coefs = np.asarray(coefs)
+            if coefs.ndim == 1:
+                feat_imp = np.abs(coefs)
+            else:
+                # multiclasses / multi-sorties : moyenne des |coef| sur les classes
+                feat_imp = np.mean(np.abs(coefs), axis=0)
+
     else:
-        # Use SelectFromModel for binary selection (linear models only)
-        features_selection = SelectFromModel(
-            estimator=base_estimator,
-            threshold=threshold,
-            prefit=True
-        )
-        return features_selection.get_support()
+        if importance_method == "shap":
+            import shap
+            explainer = shap.TreeExplainer(base_estimator)
+            shap_vals = explainer.shap_values(X, check_additivity=False)
+            if isinstance(shap_vals, list):
+                shap_vals = np.stack(shap_vals).sum(axis=0)
+            feat_imp = np.abs(shap_vals).mean(0)
+        else:
+            if hasattr(base_estimator, "get_booster"):
+                booster = base_estimator.get_booster()
+                score = booster.get_score(importance_type=importance_method)
+                feat_imp = np.array([score.get(f"f{i}", 0.)
+                                     for i in range(base_estimator.n_features_in_)])
+            else:
+                feat_imp = base_estimator.feature_importances_
+
+    # ─── Normalisation ptp identique ───────────────────────────────────────
+    if np.all(feat_imp == 0):
+        return np.zeros_like(feat_imp, dtype=float)
+
+    range_imp = np.ptp(feat_imp)
+    return np.zeros_like(feat_imp, dtype=float) if range_imp == 0 else feat_imp / range_imp
+
+# def fit_bootstrapped_sample(
+#         base_estimator,
+#         X,
+#         y,
+#         lambda_val,
+#         corr_groups=None,
+#         threshold=None,
+#         importance_method=None,
+# ):
+#     """
+#     Version binarisée — linéaires: |coef_| ; arbres/XGB: importances ; sortie booléenne (feat_imp > 0)
+#     """
+#     base_estimator.set_params(**lambda_val)
+#     if hasattr(base_estimator, "groups"):
+#         base_estimator.set_params(groups=corr_groups)
+#     base_estimator.fit(X, y)
+
+#     # ─── Linéaires : importance = |coef_| (moyenne sur classes si 2D) ─────────────────
+#     if isinstance(base_estimator, (ALasso, ALogitLasso)) \
+#             or base_estimator.__class__.__module__.startswith("sklearn.linear_model"):
+#         coefs = getattr(base_estimator, "coef_", None)
+#         if coefs is None:
+#             feat_imp = getattr(base_estimator, "feature_importances_", None)
+#             if feat_imp is None:
+#                 return np.zeros(X.shape[1], dtype=bool)
+#         else:
+#             coefs = np.asarray(coefs)
+#             feat_imp = np.abs(coefs) if coefs.ndim == 1 else np.mean(np.abs(coefs), axis=0)
+
+#     else:
+#         # ─── Arbres / boosting : SHAP optionnel, sinon importances natives ─────────────
+#         if importance_method == "shap":
+#             import shap
+#             explainer = shap.TreeExplainer(base_estimator)
+#             shap_vals = explainer.shap_values(X, check_additivity=False)
+#             if isinstance(shap_vals, list):
+#                 shap_vals = np.stack(shap_vals).sum(axis=0)
+#             feat_imp = np.abs(shap_vals).mean(0)
+#         else:
+#             if hasattr(base_estimator, "get_booster"):
+#                 booster = base_estimator.get_booster()
+#                 score = booster.get_score(importance_type=importance_method)
+#                 feat_imp = np.array([score.get(f"f{i}", 0.0)
+#                                      for i in range(base_estimator.n_features_in_)])
+#             else:
+#                 feat_imp = getattr(base_estimator, "feature_importances_", None)
+
+#     # ─── Binarisation façon "coef ≠ 0" ────────────────────────────────────────────────
+#     if feat_imp is None or np.all(feat_imp == 0):
+#         return np.zeros(X.shape[1] if feat_imp is None else feat_imp.shape[0], dtype=bool)
+    
+#     return (feat_imp > 0).astype(bool)
 
 
 class Stabl(SelectorMixin, BaseEstimator):
@@ -926,18 +933,15 @@ class Stabl(SelectorMixin, BaseEstimator):
     base_estimator: sklearn.base_estimator, default=LogisticRegression
         The base estimator used for stability selection. The estimator
         must have either a ``feature_importances_`` or ``coef_``
-        attribute after fitting. Now supports:
-        - Linear models: LogisticRegression, Lasso, ElasticNet
-        - Tree-based models: RandomForestClassifier, RandomForestRegressor
-        - XGBoost: XGBClassifier, XGBRegressor (if xgboost is installed)
+        attribute after fitting.
 
     lambda_grid: dict or "auto", default={"C": np.linspace(0.01, 1, 30)}
         Grid of values for the penalization parameter to iterate over.
-        The "auto" mode works for:
+        The "auto" mode works only when the base_estimator is :
         - LogisticRegression with l1 penalty (penalty='l1' or penalty='elasticnet')
-        - Lasso, ElasticNet with l1_ratio > 0
-        - RandomForestClassifier, RandomForestRegressor
-        - XGBClassifier, XGBRegressor (if xgboost is installed)
+        - Lasso
+        - ElasticNet with l1_ratio > 0
+        or an extension of these classes.
 
     n_lambda: int or None, default=None
         If lambda_grid is set to "auto", this is the number of lambdas to test
@@ -997,14 +1001,6 @@ class Stabl(SelectorMixin, BaseEstimator):
     sgl_groups : array-like, default=None
         Group of real features.
 
-    use_scoring: bool, default=False
-        For linear models: if True, use continuous coefficients; if False, use binary selection.
-        For tree-based models: always True.
-
-    xgb_importance_type: str, default="weight"
-        XGBoost importance type: "weight", "gain", or "cover". Only used for XGBoost models.
-
-
     verbose: int, default=0
         Controls the verbosity: the higher, the more messages.
 
@@ -1030,7 +1026,6 @@ class Stabl(SelectorMixin, BaseEstimator):
         Array of stability scores for each decoy/knockoff feature and for each value of the
         penalization parameter. Can only be accessed if we used decoy or knockoff in the
         training.
-
 
     X_artificial_: array, shape(n_repeats, n_features)
         Array of synthetic features. Can only be returned if we used decoy or knockoffs in the
@@ -1067,6 +1062,7 @@ class Stabl(SelectorMixin, BaseEstimator):
             replace=False,
             hard_threshold=None,
             fdr_threshold_range=None,
+            importance_method="gain",
             explore=False,
             n_explore=5,
             bootstrap_func=classic_bootstrap,
@@ -1074,8 +1070,6 @@ class Stabl(SelectorMixin, BaseEstimator):
             bootstrap_threshold=1e-5,
             perc_corr_group_threshold=None,
             sgl_groups=None,
-            use_scoring=False,
-            xgb_importance_type="weight",
             verbose=0,
             n_jobs=-1,
             random_state=None
@@ -1093,13 +1087,12 @@ class Stabl(SelectorMixin, BaseEstimator):
         self.sample_fraction = sample_fraction
         self.hard_threshold = hard_threshold
         self.fdr_threshold_range = fdr_threshold_range
+        self.importance_method=importance_method
         self.explore = explore
         self.n_explore = n_explore
         self.bootstrap_func = bootstrap_func
         self.sample_weight_bootstrap = sample_weight_bootstrap
         self.bootstrap_threshold = bootstrap_threshold
-        self.use_scoring = use_scoring
-        self.xgb_importance_type = xgb_importance_type
         self.verbose = verbose
         self.n_jobs = n_jobs
         self.replace = replace
@@ -1114,18 +1107,7 @@ class Stabl(SelectorMixin, BaseEstimator):
         self.fdr_min_threshold_ = None
         self.explore_threshold = None
         self.fitted_lambda_grid_ = None
-        self.isLinearModelwithScores = self.use_scoring and _is_linear_model(self.base_estimator)
-        self.scoring_attribute = None
-        if self.isLinearModelwithScores:
-            self.scoring_attribute = "coef_"
-            self.stabl_scores_binarized_ = None
-            self.stabl_scores_artificial_binarized_ = None
-        if _is_tree_based_model(self.base_estimator):
-            self.use_scoring = True
-            if isinstance(self.base_estimator, xgb.XGBClassifier) or isinstance(self.base_estimator, xgb.XGBRegressor):
-                self.scoring_attribute = self.xgb_importance_type
-            else:
-                self.scoring_attribute = "feature_importances_"
+        self.effective_artificial_proportion_ = None  # ← nouveau : ratio effectif (#art/#réelles)
 
     def _check_lambda_grid(self):
         """Check if the lambda_grid is valid. Raise error if not.
@@ -1136,18 +1118,12 @@ class Stabl(SelectorMixin, BaseEstimator):
                     f'If lambda_grid is a string, it must be "auto", got {self.lambda_grid}'
                 )
             base_estimator = self.base_estimator
-            while not isinstance(base_estimator, (LogisticRegression, Lasso, ElasticNet, RandomForestClassifier, RandomForestRegressor)) and hasattr(base_estimator, "model"):
+            while not isinstance(base_estimator, (LogisticRegression, Lasso, ElasticNet)) and hasattr(base_estimator, "model"):
                 base_estimator = base_estimator.model
-            
-            # Check for XGBoost
-            is_xgb = XGBOOST_AVAILABLE and isinstance(base_estimator, (xgb.XGBClassifier, xgb.XGBRegressor))
-            is_linear = isinstance(base_estimator, (LogisticRegression, Lasso, ElasticNet))
-            is_rf = isinstance(base_estimator, (RandomForestClassifier, RandomForestRegressor))
-            
-            if not (is_linear or is_rf or is_xgb):
+            if not isinstance(base_estimator, (LogisticRegression, Lasso, ElasticNet)):
                 raise ValueError(
                     f'If lambda_grid is "auto", the base_estimator must be a LogisticRegression, '
-                    f'Lasso, ElasticNet, RandomForest, or XGBoost, got {base_estimator}'
+                    f'Lasso or ElasticNet, got {base_estimator}'
                 )
             if isinstance(base_estimator, (LogisticRegression, ElasticNet)) and \
                     base_estimator.l1_ratio is not None and \
@@ -1176,40 +1152,16 @@ class Stabl(SelectorMixin, BaseEstimator):
         if self.lambda_grid != "auto":
             return self.lambda_grid
 
-        base_estimator = self.base_estimator
-        while hasattr(base_estimator, "model"):
-            base_estimator = base_estimator.model
-
-        # Check for XGBoost
-        if XGBOOST_AVAILABLE and isinstance(base_estimator, (xgb.XGBClassifier, xgb.XGBRegressor)):
-            # XGBoost parameter grid
-            n_lambda = 10 if self.n_lambda is None else self.n_lambda
-            return {
-                "n_estimators": [50, 100, 200],
-                "max_depth": [3, 5, 7],
-                "learning_rate": np.linspace(0.01, 0.3, n_lambda)
-            }
-        
-        # Check for RandomForest
-        elif isinstance(base_estimator, (RandomForestClassifier, RandomForestRegressor)):
-            n_lambda = 10 if self.n_lambda is None else self.n_lambda
-            return {
-                "n_estimators": [50, 100, 200],
-                "max_depth": [3, 5, 7, None],
-                "min_samples_split": [2, 5, 10]
-            }
-
-        # Linear models (existing logic)
         l1_ratio = None
         n_lambda = 30 if self.n_lambda is None else self.n_lambda
-        if isinstance(base_estimator, LogisticRegression) or isinstance(getattr(self.base_estimator, "model", None), LogisticRegression):
+        if isinstance(self.base_estimator, LogisticRegression) or isinstance(getattr(self.base_estimator, "model", None), LogisticRegression):
             task_type = "classification"
             if getattr(self.base_estimator, "penalty", getattr(getattr(self.base_estimator, "model", None), "penalty", None)) == "elasticnet":
                 l1_ratio = [0.5, 0.7, 0.9]
                 n_lambda = 10 if self.n_lambda is None else self.n_lambda
         else:
             task_type = "regression"
-            if (isinstance(base_estimator, ElasticNet) and not isinstance(base_estimator, Lasso)) \
+            if (isinstance(self.base_estimator, ElasticNet) and not isinstance(self.base_estimator, Lasso)) \
                     or (isinstance(getattr(self.base_estimator, "model", None), ElasticNet) and not isinstance(getattr(self.base_estimator, "model", None), Lasso)):
                 l1_ratio = [0.5, 0.7, 0.9]
                 n_lambda = 10 if self.n_lambda is None else self.n_lambda
@@ -1237,9 +1189,9 @@ class Stabl(SelectorMixin, BaseEstimator):
                 f'the user must define a hard_threshold of selection, got {self.hard_threshold}'
             )
 
-        if self.artificial_type is not None and not (0.0 < self.artificial_proportion <= 1.):
+        if self.artificial_type is not None and not (self.artificial_proportion > 0.0):
             raise ValueError(
-                f"When injecting noise, the noise proportion must be between 0 and 1, "
+                f"When injecting noise, the noise proportion must be positive, "
                 f"got {self.artificial_proportion}"
             )
 
@@ -1324,19 +1276,12 @@ class Stabl(SelectorMixin, BaseEstimator):
 
         # Initializing the Stabl scores
         self.stabl_scores_ = np.zeros((n_features, n_lambdas))
-        
-        # Initialize binarized scores if needed
-        if self.isLinearModelwithScores:
-            self.stabl_scores_binarized_ = np.zeros((n_features, n_lambdas))
 
         # __Synthetic features and coefs__
         if self.artificial_type is not None:
             # Only initialize those score if we use artificial features
             self.stabl_scores_artificial_ = np.zeros(
                 (n_injected_noise, n_lambdas))
-            if self.isLinearModelwithScores:
-                self.stabl_scores_artificial_binarized_ = np.zeros(
-                    (n_injected_noise, n_lambdas))
             X = self._make_artificial_features(
                 X=X,
                 nb_noise=n_injected_noise,
@@ -1370,40 +1315,28 @@ class Stabl(SelectorMixin, BaseEstimator):
                 file=sys.stdout,
                 disable=(not leave)
         ):
-            feature_scores = Parallel(
-                    n_jobs=self.n_jobs,
-                    verbose=0,
-                    pre_dispatch='2*n_jobs'
-                )(delayed(fit_bootstrapped_sample)(
-                    clone(base_estimator),
-                    X=X[safe_mask(X, subsample_indices), :],
-                    y=y[subsample_indices],
-                    corr_groups=corr_groups,
-                    lambda_val=lambda_val,
-                    threshold=self.bootstrap_threshold,
-                    use_scoring=self.use_scoring,
-                    scoring_attribute=self.scoring_attribute
-                )
-                    for subsample_indices in bootstrap_indices
-                )
-            
-            # Simplified computation: handle scoring directly in the loop
-            if self.isLinearModelwithScores:
-                # For linear models with use_scoring=True: get continuous scores and immediately binarize
-                binary_feature_scores = np.vstack([
-                    _derive_binary_selection_from_scores(scores, threshold=None)
-                    for scores in feature_scores
-                ])
-                
-                # Store binarized scores
-                if self.artificial_type is not None:
-                    self.stabl_scores_artificial_binarized_[:, idx] = binary_feature_scores[:, n_features:].mean(axis=0)
-                self.stabl_scores_binarized_[:, idx] = binary_feature_scores[:, :n_features].mean(axis=0)
-            
-            # Store continuous scores
+            # Computing the frequencies
+            selected_variables = Parallel(
+                n_jobs=self.n_jobs,
+                verbose=0,
+                pre_dispatch='2*n_jobs'
+            )(delayed(fit_bootstrapped_sample)(
+                clone(base_estimator),
+                X=X[safe_mask(X, subsample_indices), :],
+                y=y[subsample_indices],
+                corr_groups=corr_groups,
+                lambda_val=lambda_val,
+                threshold=self.bootstrap_threshold,
+                importance_method=self.importance_method
+            )
+                for subsample_indices in bootstrap_indices
+            )
+
             if self.artificial_type is not None:
-                self.stabl_scores_artificial_[:, idx] = np.vstack(feature_scores)[:, n_features:].mean(axis=0)
-            self.stabl_scores_[:, idx] = np.vstack(feature_scores)[:, :n_features].mean(axis=0)
+                self.stabl_scores_artificial_[:, idx] = np.vstack(
+                    selected_variables)[:, n_features:].mean(axis=0)
+            self.stabl_scores_[:, idx] = np.vstack(selected_variables)[
+                :, :n_features].mean(axis=0)
 
         if self.artificial_type is not None:
             self._compute_FDPplus()
@@ -1551,69 +1484,259 @@ class Stabl(SelectorMixin, BaseEstimator):
 
         return mask
 
+    # def _make_artificial_features(self, X, artificial_type, nb_noise, random_state=None):
+    #     """
+    #     Function generating the artificial features before the bootstrap process begins.
+    #     The artificial features will be concatenated to the original dataset.
+
+    #     Parameters
+    #     ----------
+    #     X : array-like, size=(n_repeats, n_features)
+    #         The input array.
+
+    #     artificial_type: str
+    #         The type of artificial features to generate
+    #         Can either be "random_permutation" or "knockoff"
+
+    #     nb_noise: int
+    #         Number of artificial features to generate
+
+    #     Returns
+    #     -------
+    #     X_out : array-like, size=(n_repeats, n_features + n_artificial_features)
+    #         The input array concatenated with the artificial features
+    #     """
+
+    #     if artificial_type == "random_permutation":
+    #         rng = np.random.default_rng(seed=random_state)
+    #         X_artificial = X.copy()
+    #         indices = rng.choice(
+    #             a=X_artificial.shape[1], size=nb_noise, replace=False)
+    #         self.noise_group = indices
+    #         X_artificial = X_artificial[:, indices]
+
+    #         for i in range(X_artificial.shape[1]):
+    #             rng.shuffle(X_artificial[:, i])
+
+    #     elif artificial_type == "knockoff":
+    #         np.random.seed(random_state)
+    #         rng = np.random.default_rng(seed=random_state)
+    #         n_features = X.shape[1]
+
+    #         if n_features > 3000:
+    #             initial_shape = (X.shape[0], (X.shape[1]//3000 + 1) * 3000)
+    #             X_artificial = np.empty(initial_shape)
+    #             for i in range(X.shape[1]//3000 + 1):
+    #                 cols = rng.choice(a=X.shape[1], size=3000, replace=False)
+    #                 X_tmp = X[:, cols]
+    #                 X_art_tmp = GaussianSampler(X_tmp, method='equicorrelated').sample_knockoffs()
+    #                 X_artificial[:, i*3000: (i+1)*3000] = X_art_tmp
+    #             X_artificial = X_artificial[:, rng.choice(a=X_artificial.shape[1], size=X.shape[1], replace=False)]
+
+    #         else:
+    #             X_artificial = GaussianSampler(X, method='equicorrelated').sample_knockoffs()
+
+    #         indices = rng.choice(a=X_artificial.shape[1], size=nb_noise, replace=False)
+    #         self.noise_group = indices
+    #         X_artificial = X_artificial[:, indices]
+
+    #     else:
+    #         raise ValueError("The type of artificial feature must be in ['random_permutation', 'knockoff']."
+    #                          f" Got {artificial_type}")
+
+    #     self.X_artificial_ = X_artificial
+
+    #     return np.concatenate([X, X_artificial], axis=1)
+    
     def _make_artificial_features(self, X, artificial_type, nb_noise, random_state=None):
         """
-        Function generating the artificial features before the bootstrap process begins.
-        The artificial features will be concatenated to the original dataset.
+        Génère des features artificielles et les concatène à X, en conservant la logique d’origine,
+        mais en supportant nb_noise > p (p = nb de features réelles).
 
-        Parameters
+        ──────────────────────────────────────────────────────────────────────────────
+        LOGIQUE (identique à l’original + répétition quand nb_noise > p)
+        ──────────────────────────────────────────────────────────────────────────────
+        • random_permutation :
+            - d’origine : on duplique X -> on sélectionne 'nb_noise' colonnes -> on permute
+            - maintenant : si nb_noise > p, on crée K sets de p colonnes permutées + 1 set partiel r colonnes
+        • knockoff :
+            - d’origine : un seul set de knockoffs (ou une "banque" par blocs de 3000 si p>3000), puis on prend 'nb_noise' colonnes
+            - maintenant : si nb_noise > p, on génère K sets complets + 1 set partiel, en réutilisant la même mécanique
+
+        • self.noise_group :
+            - tableau d’entiers, un par colonne artificielle générée
+            - valeur = index (0..p-1) de la vraie colonne correspondante
+            (utile pour grouper réelle+artificielle(s) si besoin)
+
+        • Reproductibilité :
+            - on réutilise np.random.default_rng(random_state) (permutation)
+            - on réutilise np.random.seed(...) lors des appels à GaussianSampler (knockoff),
+            et on décale légèrement la seed entre les sets pour produire des copies différentes.
+
+        Paramètres
         ----------
-        X : array-like, size=(n_repeats, n_features)
-            The input array.
+        X : ndarray (n_samples, p)
+            Données réelles
+        artificial_type : {"random_permutation", "knockoff"}
+            Type d’artificielles demandées
+        nb_noise : int
+            Nombre total de colonnes artificielles à générer
+        random_state : int | None
+            Graine
 
-        artificial_type: str
-            The type of artificial features to generate
-            Can either be "random_permutation" or "knockoff"
-
-        nb_noise: int
-            Number of artificial features to generate
-
-        Returns
-        -------
-        X_out : array-like, size=(n_repeats, n_features + n_artificial_features)
-            The input array concatenated with the artificial features
+        Retour
+        ------
+        X_out : ndarray (n_samples, p + nb_noise)
+            X concaténé avec les colonnes artificielles
         """
 
+        # Dimensions de X
+        n_samples, p = X.shape
+
+        # Générateur RNG (comme dans l’original) pour toutes les opérations "rng.*"
+        rng = np.random.default_rng(seed=random_state)
+
+        # Cas dégénéré : rien à ajouter → on renvoie X "tel quel"
+        if nb_noise <= 0:
+            self.noise_group = np.array([], dtype=int)
+            self.X_artificial_ = np.empty((n_samples, 0))
+            return np.concatenate([X, self.X_artificial_], axis=1)
+
+        # ─────────────────────────────────────────────────────────────────────
+        # Décomposition de nb_noise en :
+        #   K_full blocs complets de taille p   +   un dernier bloc partiel de taille r
+        #   (nb_noise = K_full * p + r, avec 0 ≤ r < p)
+        # ─────────────────────────────────────────────────────────────────────
+        K_full, r = divmod(nb_noise, p)
+
+        # Conteneurs finaux :
+        #   - blocks : liste des matrices artificielles (n_samples x q) à concaténer
+        #   - noise_map : pour chaque colonne artificielle dans "blocks", index de la vraie colonne correspondante (0..p-1)
+        blocks = []
+        noise_map = []
+
+        # ─────────────────────────────────────────────────────────────────────
+        # 1) CAS "random_permutation"
+        # ─────────────────────────────────────────────────────────────────────
         if artificial_type == "random_permutation":
-            rng = np.random.default_rng(seed=random_state)
-            X_artificial = X.copy()
-            indices = rng.choice(
-                a=X_artificial.shape[1], size=nb_noise, replace=False)
-            self.noise_group = indices
-            X_artificial = X_artificial[:, indices]
+            # --- K sets complets de permutations ---
+            # Chaque set : on copie X puis on permute indépendamment chaque colonne (exactement comme avant)
+            for k in range(K_full):
+                X_perm = X.copy()
+                # on permute "in place" colonne par colonne
+                for j in range(p):
+                    rng.shuffle(X_perm[:, j])          # permutation (identique à l’original)
+                blocks.append(X_perm)                   # on empile ce bloc p-colonnes
+                noise_map.extend(range(p))             # mapping artificielle→vraie : ici c'est 1-à-1 (colonne j ↔ j)
 
-            for i in range(X_artificial.shape[1]):
-                rng.shuffle(X_artificial[:, i])
+            # --- Set partiel (r colonnes), si besoin ---
+            # On choisit r colonnes de X, on les copie et on les permute.
+            if r > 0:
+                cols = rng.choice(a=p, size=r, replace=False)  # indices réels des colonnes qu’on va cloner/permutter
+                X_part = X[:, cols].copy()
+                for j in range(r):
+                    rng.shuffle(X_part[:, j])
+                blocks.append(X_part)                           # bloc partiel (r colonnes)
+                noise_map.extend(cols.tolist())                # mapping vers les colonnes réelles sélectionnées
 
+            # Concaténation finale des blocs artificiels (peut être vide si nb_noise=0)
+            X_artificial = np.concatenate(blocks, axis=1) if blocks else np.empty((n_samples, 0))
+
+            # Mémos pour l’objet
+            self.noise_group = np.array(noise_map, dtype=int)  # taille = nb_noise
+            self.X_artificial_ = X_artificial                  # pour inspection ultérieure
+
+            # On renvoie X || artificielles (comme avant)
+            return np.concatenate([X, X_artificial], axis=1)
+
+        # ─────────────────────────────────────────────────────────────────────
+        # 2) CAS "knockoff"
+        # ─────────────────────────────────────────────────────────────────────
         elif artificial_type == "knockoff":
+            # L’original fixait la graine globale NumPy juste avant d’appeler GaussianSampler
             np.random.seed(random_state)
-            rng = np.random.default_rng(seed=random_state)
-            n_features = X.shape[1]
 
-            if n_features > 3000:
-                initial_shape = (X.shape[0], (X.shape[1]//3000 + 1) * 3000)
-                X_artificial = np.empty(initial_shape)
-                for i in range(X.shape[1]//3000 + 1):
-                    cols = rng.choice(a=X.shape[1], size=3000, replace=False)
-                    X_tmp = X[:, cols]
-                    X_art_tmp = GaussianSampler(X_tmp, method='equicorrelated').sample_knockoffs()
-                    X_artificial[:, i*3000: (i+1)*3000] = X_art_tmp
-                X_artificial = X_artificial[:, rng.choice(a=X_artificial.shape[1], size=X.shape[1], replace=False)]
+            def one_full_knockoff(seed_offset=0):
+                """
+                Produit **un set complet** de knockoffs de taille p, en suivant la logique d’origine.
+                - Si p <= 3000 : un unique appel à GaussianSampler(X).sample_knockoffs()
+                - Si p  > 3000 : on bâtit une "banque" par blocs de 3000 colonnes, comme l’original,
+                                puis on sous-échantillonne p colonnes dans cette banque.
+                Retour :
+                Xk_full : ndarray (n_samples, p)  → le bloc de p colonnes artificielles
+                pool_map : list[int] de taille p   → mapping artificielle→index réel (0..p-1)
+                """
+                if p > 3000:
+                    # Taille de la banque (multiple de 3000, ≥ p)
+                    initial_shape = (n_samples, (p // 3000 + 1) * 3000)
+                    bank = np.empty(initial_shape)    # banque des knockoffs (n_samples x bank_width)
+                    bank_map = []                     # mapping pour chaque col de la banque → index réel d’origine
 
-            else:
-                X_artificial = GaussianSampler(X, method='equicorrelated').sample_knockoffs()
+                    # On remplit la banque par "tranches" de 3000 colonnes
+                    for i in range(p // 3000 + 1):
+                        # on échantillonne 3000 colonnes réelles
+                        cols = rng.choice(a=p, size=3000, replace=False)
+                        X_tmp = X[:, cols]
 
-            indices = rng.choice(a=X_artificial.shape[1], size=nb_noise, replace=False)
-            self.noise_group = indices
-            X_artificial = X_artificial[:, indices]
+                        # graine décalée pour varier les knockoffs entre blocs (reproductible si random_state fixé)
+                        seed_k = None if random_state is None else int(random_state) + seed_offset + i + 1
+                        np.random.seed(seed_k)
 
+                        # génération knockoff pour ce mini-bloc (exactement comme l’original)
+                        X_art_tmp = GaussianSampler(X_tmp, method='equicorrelated').sample_knockoffs()
+
+                        # on place ce mini-bloc dans la banque
+                        bank[:, i * 3000:(i + 1) * 3000] = X_art_tmp
+                        # on mémorise le mapping des 3000 colonnes de la banque vers leurs vraies colonnes
+                        bank_map.extend(cols.tolist())
+
+                    # Une fois la banque remplie, on en **sélectionne p colonnes** (comme l’original)
+                    sel = rng.choice(a=bank.shape[1], size=p, replace=False)
+                    Xk_full = bank[:, sel]                 # set complet de taille p
+                    pool_map = [bank_map[s] for s in sel]  # mapping artificielle→vraie
+                    return Xk_full, pool_map
+
+                else:
+                    # Cas simple p ≤ 3000 : un seul appel
+                    seed_k = None if random_state is None else int(random_state) + seed_offset + 1
+                    np.random.seed(seed_k)  # comme l’original, on fixe la seed NumPy avant GaussianSampler
+                    Xk_full = GaussianSampler(X, method='equicorrelated').sample_knockoffs()
+                    # mapping artificielle→vraie = 0..p-1 (même ordre)
+                    pool_map = list(range(p))
+                    return Xk_full, pool_map
+
+            # --- K sets complets de knockoffs ---
+            for k in range(K_full):
+                # seed_offset différent par set pour produire des copies "indépendantes"
+                Xk, pool_map = one_full_knockoff(seed_offset=1000 * k)
+                blocks.append(Xk)                 # bloc (n_samples x p)
+                noise_map.extend(pool_map)        # mapping p-long
+
+            # --- Set partiel r, si besoin ---
+            if r > 0:
+                # On produit un **autre** set complet, puis on n’en prélève que r colonnes
+                Xk, pool_map = one_full_knockoff(seed_offset=1000 * K_full)
+                sel = rng.choice(a=p, size=r, replace=False)  # indices (0..p-1) dans ce set complet
+                blocks.append(Xk[:, sel])                     # bloc partiel (n_samples x r)
+                noise_map.extend([pool_map[i] for i in sel])  # mapping partiel
+
+            # Concaténation finale des blocs artificiels
+            X_artificial = np.concatenate(blocks, axis=1) if blocks else np.empty((n_samples, 0))
+
+            # Mémos pour l’objet
+            self.noise_group = np.array(noise_map, dtype=int)   # taille = nb_noise
+            self.X_artificial_ = X_artificial
+
+            # Retour : X || artificielles
+            return np.concatenate([X, X_artificial], axis=1)
+
+        # ─────────────────────────────────────────────────────────────────────
+        # 3) Autre type non supporté
+        # ─────────────────────────────────────────────────────────────────────
         else:
             raise ValueError("The type of artificial feature must be in ['random_permutation', 'knockoff']."
-                             f" Got {artificial_type}")
+                            f" Got {artificial_type}")
 
-        self.X_artificial_ = X_artificial
-
-        return np.concatenate([X, X_artificial], axis=1)
 
     def _compute_FDPplus(self):
         """Function that computes the FDRc at each value of the `thresholds_grid`.
@@ -1662,37 +1785,3 @@ class Stabl(SelectorMixin, BaseEstimator):
         for p in ParameterGrid(self.fitted_lambda_grid_):
             keys.update(p.keys())
         return list(keys)
-
-    def toggle_binarized_scores(self, use_binarized=None):
-        """
-        Toggle between using continuous and binarized stability scores.
-        
-        Parameters
-        ----------
-        use_binarized : bool, optional
-            If True, use binarized scores. If False, use continuous scores.
-            If None, toggle the current state.
-            
-        Returns
-        -------
-        self : Stabl
-            Returns self for method chaining
-        """
-        check_is_fitted(self, 'stabl_scores_')
-        
-        if not self.isLinearModelwithScores:
-            raise ValueError(
-                "toggle_binarized_scores is only available for linear models with use_scoring=True. "
-                f"Current model type: {type(self.base_estimator).__name__}, use_scoring: {self.use_scoring}"
-            )
-        
-        self.use_binarized_scores = not self.use_binarized_scores
-        
-        self.stabl_scores_binarized_,self.stabl_scores_ = self.stabl_scores_,self.stabl_scores_binarized_
-        
-        # Recalculate FDR if artificial features were used
-        if self.artificial_type is not None:
-            self.stabl_scores_artificial_binarized_,self.stabl_scores_artificial_ = self.stabl_scores_artificial_,self.stabl_scores_artificial_binarized_
-            self._compute_FDPplus()
-        
-        return self

@@ -1,11 +1,11 @@
-from .unionfind import UnionFind
+from unionfind import UnionFind
 import sys
 from tqdm.autonotebook import tqdm
-from .pipelines_utils import save_plots, compute_scores_table, compute_pvalues_table
-from .stacked_generalization import stacked_multi_omic
-from .metrics import jaccard_matrix
-from .stabl import save_stabl_results
-from .preprocessing import remove_low_info_samples, LowInfoFilter
+from pipelines_utils import save_plots, compute_scores_table, compute_pvalues_table
+from stacked_generalization import stacked_multi_omic
+from metrics import jaccard_matrix
+from stabl import save_stabl_results
+from preprocessing import remove_low_info_samples, LowInfoFilter
 from sklearn.model_selection import RepeatedKFold, RepeatedStratifiedKFold, GroupShuffleSplit
 from sklearn.feature_selection import VarianceThreshold
 from sklearn.preprocessing import StandardScaler

@@ -13,7 +13,7 @@ from sklearn.model_selection import cross_val_predict, LeaveOneOut, StratifiedKF
 from sklearn.preprocessing import LabelBinarizer
 from sklearn.linear_model import LinearRegression
 
-from .utils import compute_CI
+from utils import compute_CI
 
 colors = ['#a8e6ce', '#dcedc2', '#ffd3b5', '#ffaaa6',
           '#ff8c94', '#e3819d', '#a188b7', '#487fad']
@@ -578,7 +578,7 @@ def scatterplot_regression_predictions(
         y_preds,
         show_fig=True,
         export_file=False,
-        paths='./Scatterplot of predictions',
+        path='./Scatterplot of predictions',
         linear_estimation=True,
         **kwargs
 ):
@@ -600,7 +600,7 @@ def scatterplot_regression_predictions(
         The names of the different file are generated automatically with the name
         of the features. 
 
-    paths: str or Path or list of Path, default='./'
+    path: str or Path,
         Path to the directory. Should also contain the name of the file and the
         extension (format)
 
@@ -609,8 +609,6 @@ def scatterplot_regression_predictions(
 
     **kwargs: arguments
     """
-    if not isinstance(paths, list):
-        paths = [paths]
 
     fig, ax = plt.subplots(1, 1, **kwargs)
     sns.scatterplot(ax=ax, x=y_true, y=y_preds, color="#d4e0f6", alpha=.9, edgecolor="#ACB4CD", s=50)
@@ -643,8 +641,7 @@ def scatterplot_regression_predictions(
 
     plt.tight_layout()
     if export_file:
-        for path in paths:
-            fig.savefig(path, dpi=95)
+        fig.savefig(path, dpi=95)
 
     if not show_fig:
         plt.close()

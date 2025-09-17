@@ -11,18 +11,20 @@ setuptools.setup(
     description='Stabl light weight',
     packages=['stabl'],
     install_requires=[
-        'joblib>=1.3.2',
+        'joblib==1.4.2',
         'tqdm>=4.66.1',
-        'numpy>=1.26.2',
+        'numpy==1.26.4',
         'matplotlib>=3.8.2',
-        "knockpy>=1.3.1",
-        "scikit-learn>=1.3.2",
+        "knockpy==1.3.1",
+        "scikit-learn==1.4.2",
         "seaborn>=0.13.0",
-        "pandas>=2.1.4",
-        "statsmodels>=0.14.0",
+        "pandas==2.2.2",
+        "statsmodels==0.14.2",
         "openpyxl>=3.1.2",
-        "adjustText>=0.8",
+        "adjustText==1.1.1",
         "scipy>=1.11.4",
         "osqp>=0.6.3",
+        "xgboost>=3.0.5",
+        
     ]
 )

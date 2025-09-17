@@ -1,10 +1,12 @@
-from .unionfind import UnionFind
+from unionfind import UnionFind
 import sys
 from tqdm.autonotebook import tqdm
-from .preprocessing import remove_low_info_samples
+from preprocessing import remove_low_info_samples
 from sklearn.preprocessing import StandardScaler
 from sklearn.pipeline import Pipeline
 from sklearn.linear_model import LogisticRegression, LinearRegression
+from sklearn.ensemble import RandomForestRegressor, RandomForestClassifier
+from xgboost import XGBRegressor,XGBClassifier
 from sklearn.impute import SimpleImputer
 from sklearn import clone
 from scipy.optimize import nnls
@@ -13,13 +15,19 @@ import pandas as pd
 from sklearn.exceptions import ConvergenceWarning
 from sklearn.utils._testing import ignore_warnings
 from sklearn.metrics import roc_auc_score, average_precision_score, r2_score, mean_squared_error, mean_absolute_error
-from .utils import compute_CI
-from .metrics import jaccard_matrix
-from .visualization import boxplot_binary_predictions, plot_roc
+from utils import compute_CI
+from metrics import jaccard_matrix
+from visualization import boxplot_binary_predictions, plot_roc, scatterplot_regression_predictions
 from pathlib import Path
+
 
 logit = LogisticRegression(penalty=None, class_weight="balanced", max_iter=int(1e6))
 linreg = LinearRegression()
+randomforest=RandomForestRegressor(n_estimators=200, max_depth=5)
+randomforest_class=RandomForestClassifier(n_estimators=200, max_depth=5)
+xgboost = XGBRegressor()
+xgboost_class=XGBClassifier()
+
 std_pipe = Pipeline(
     steps=[
         ('imputer', SimpleImputer(strategy="median")),
@@ -71,9 +79,6 @@ def single_omic_simple(
     task_type: str
         Can either be "binary" for binary classification or "regression" for regression tasks.
 
-    save_path: Path or str
-        Where to save the results
-
     outer_groups: pd.Series, default=None
         If used, should be the same size as y and should indicate the groups of the samples.
 
@@ -87,24 +92,35 @@ def single_omic_simple(
     """
 
     stablFlag = "stabl" in estimator_name
-    foldIdx = [f"Fold_{i+1}" for i in range(outer_splitter.get_n_splits(X=data, y=y, groups=outer_groups))]
+    n_folds = outer_splitter.get_n_splits(X=data, y=y, groups=outer_groups)
+    foldIdx = [f"Fold_{i+1}" for i in range(n_folds)]
 
-    predictions = pd.DataFrame(index=y.index, columns=foldIdx,dtype=float)
-    selected_features= pd.DataFrame(data=False, columns=data.columns, index=foldIdx)
+    predictions_list = []
+    selected_features_list = []
     if stablFlag:
-        stabl_features= pd.DataFrame( columns=["Threshold", "min FDP+"], index=foldIdx)
+        stabl_features_list = []
+        predictions_list_xgboost = []
+        predictions_list_rf = []
     else:
         best_params = []
         if not ef:
-            insamplePredictions = pd.DataFrame(index=y.index, columns=foldIdx, dtype = float)
+            insamplePredictions_list = []
+    # predictions = pd.DataFrame(index=y.index, columns=foldIdx,dtype=float)
+    # selected_features= pd.DataFrame(data=False, columns=data.columns, index=foldIdx)
+    # if stablFlag:
+    #     stabl_features= pd.DataFrame( columns=["Threshold", "min FDP+"], index=foldIdx)
+    # else:
+    #     best_params = []
+    #     if not ef:
+    #         insamplePredictions = pd.DataFrame(index=y.index, columns=foldIdx, dtype = float)
 
     k = 1
     for train, test in (tbar := tqdm(
             outer_splitter.split(data, y, groups=outer_groups),
-            total=outer_splitter.get_n_splits(X=data, y=y, groups=outer_groups),
+            total=n_folds,
             file=sys.stdout
     )):
-        train_idx, test_idx = y.iloc[train].index, y.iloc[test].index
+        # train_idx, test_idx = y.iloc[train].index, y.iloc[test].index
         groups = outer_groups.iloc[train].values if outer_groups is not None else None
 
         fold_selected_features = []
@@ -116,7 +132,14 @@ def single_omic_simple(
         X_train_std = fromPreprocessing(X_train,preprocessing)
         X_test_std = fromPreprocessingRep(X_test,preprocessing)
 
-        if estimator_name in ["lasso", "alasso","en"]:
+        fold_predictions = np.full(len(y), np.nan)
+        fold_selected = np.zeros(len(data.columns), dtype=bool)
+        
+        if stablFlag:
+            fold_predictions_xgboost = np.full(len(y), np.nan)
+            fold_predictions_rf = np.full(len(y), np.nan)
+
+        if estimator_name in ["lasso", "alasso","en"]: 
             model = clone(estimator)
             model.fit(X_train_std, y_train, groups=groups)
             if task_type == "binary":
@@ -128,19 +151,31 @@ def single_omic_simple(
                 if not ef:
                     insamplePreds = model.predict(X_train_std)
             if not ef:
-                insamplePredictions.loc[train_idx,f'Fold_{k}'] = insamplePreds
-            tmp_sel_features = list(X_train_std.columns[np.where(model.best_estimator_.coef_.flatten())])
-            fold_selected_features.extend(tmp_sel_features)
-            predictions.loc[test_idx, f"Fold_{k}"] = pred
+                # insamplePredictions.loc[train_idx,f'Fold_{k}'] = insamplePreds 
+                insample_fold = np.full(len(y), np.nan)
+                insample_fold[train] = insamplePreds
+                insamplePredictions_list.append(insample_fold)
+            tmp_sel_features = np.where(model.best_estimator_.coef_.flatten())[0]
+            fold_selected[tmp_sel_features] = True
+            fold_predictions[test] = pred
+            # tmp_sel_features = list(X_train_std.columns[np.where(model.best_estimator_.coef_.flatten())])
+            # fold_selected_features.extend(tmp_sel_features)
+            # predictions.loc[test_idx, f"Fold_{k}"] = pred
             best_params.append(model.best_params_)
 
         # __STABL__
         if stablFlag:
             estimator.fit(X_train_std, y_train, groups=groups)
             tmp_sel_features = list(estimator.get_feature_names_out())
-            fold_selected_features.extend(tmp_sel_features)
-            stabl_features.loc[f'Fold_{k}', "min FDP+"] = estimator.min_fdr_
-            stabl_features.loc[f'Fold_{k}', "Threshold"] = estimator.fdr_min_threshold_
+            # fold_selected_features.extend(tmp_sel_features)
+            # stabl_features.loc[f'Fold_{k}', "min FDP+"] = estimator.min_fdr_
+            # stabl_features.loc[f'Fold_{k}', "Threshold"] = estimator.fdr_min_threshold_
+            tmp_sel_idx = [data.columns.get_loc(f) for f in tmp_sel_features]
+            fold_selected[tmp_sel_idx] = True
+            stabl_features_list.append({
+            "Threshold": estimator.fdr_min_threshold_,
+            "min FDP+": estimator.min_fdr_
+            })
 
             X_train = X_train[fold_selected_features]
             X_test = X_test[fold_selected_features]
@@ -152,31 +187,84 @@ def single_omic_simple(
                 # __Final Models__
                 if task_type == "binary":
                     pred = clone(logit).fit(X_train, y_train).predict_proba(X_test)[:, 1].flatten()
+                    pred_xgboost = clone(xgboost_class).fit(X_train, y_train).predict_proba(X_test)[:, 1].flatten()
+                    pred_rf = clone(randomforest_class).fit(X_train, y_train).predict_proba(X_test)[:, 1].flatten()
                 elif task_type == "regression":
                     pred = clone(linreg).fit(X_train, y_train).predict(X_test)
+                    pred_xgboost = clone(xgboost).fit(X_train, y_train).predict(X_test)
+                    pred_rf = clone(randomforest).fit(X_train, y_train).predict(X_test)
                 else:
                     raise ValueError("task_type not recognized.")
 
-                predictions.loc[test_idx, f"Fold_{k}"] = pred
+                # Store predictions for all variants
+                fold_predictions[test] = pred
+                fold_predictions_xgboost[test] = pred_xgboost
+                fold_predictions_rf[test] = pred_rf
 
             else:
                 if task_type == "binary":
-                    predictions.loc[test_idx, f'Fold_{k}'] = [0.5] * len(test_idx)
+                    # predictions.loc[test_idx, f'Fold_{k}'] = [0.5] * len(test_idx)
+                    fold_predictions[test] = 0.5
+                    fold_predictions_xgboost[test] = 0.5
+                    fold_predictions_rf[test] = 0.5
                 elif task_type == "regression":
-                    predictions.loc[test_idx, f'Fold_{k}'] = [np.mean(y_train)] * len(test_idx)
-
+                    # predictions.loc[test_idx, f'Fold_{k}'] = [np.mean(y_train)] * len(test_idx)
+                    mean_y = np.mean(y_train)
+                    fold_predictions[test] = mean_y
+                    fold_predictions_xgboost[test] = mean_y
+                    fold_predictions_rf[test] = mean_y
                 else:
                     raise ValueError("task_type not recognized.")
 
-        selected_features.loc[f'Fold_{k}', fold_selected_features] = True
+        # selected_features.loc[f'Fold_{k}', fold_selected_features] = True
+        selected_features_list.append(fold_selected)
+        predictions_list.append(fold_predictions)
+        
+        if stablFlag:
+            predictions_list_xgboost.append(fold_predictions_xgboost)
+            predictions_list_rf.append(fold_predictions_rf)
+        
         # print("~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~\n")
         k += 1
 
+    predictions = pd.DataFrame(
+        data=np.column_stack(predictions_list),
+        index=y.index,
+        columns=foldIdx
+        )
+    selected_features = pd.DataFrame(
+        data=np.vstack(selected_features_list),
+        columns=data.columns,
+        index=foldIdx
+        )
+
     if stablFlag:
-        return 1,predictions,selected_features,stabl_features
+        stabl_features = pd.DataFrame(
+            stabl_features_list, 
+            columns=["Threshold", "min FDP+"],
+            index=foldIdx)
+        
+        # Create DataFrames for all prediction variants
+        predictions_xgboost = pd.DataFrame(
+            data=np.column_stack(predictions_list_xgboost),
+            index=y.index,
+            columns=foldIdx
+        )
+        predictions_rf = pd.DataFrame(
+            data=np.column_stack(predictions_list_rf),
+            index=y.index,
+            columns=foldIdx
+        )
+        
+        return 1, predictions, selected_features, stabl_features, predictions_xgboost, predictions_rf
     else:
         if ef:
             return 2,predictions,selected_features,best_params
+        insamplePredictions = pd.DataFrame(
+            data=np.column_stack(insamplePredictions_list),
+            index=y.index,
+            columns=foldIdx
+        )
         return 0,predictions,selected_features,best_params, insamplePredictions
 
 def save_single_omic_results(y,results,savePath,taskType):
@@ -184,14 +272,23 @@ def save_single_omic_results(y,results,savePath,taskType):
         case 0:
             preds,selectedFeats,bestParams,insamplePredictions = results[1:]
             stablFeats = None
+            preds_xgboost = None
+            preds_rf = None
         case 1:
-            preds,selectedFeats,stablFeats = results[1:]
+            if len(results) == 6:
+                preds,selectedFeats,stablFeats,preds_xgboost,preds_rf = results[1:]
+            else:  # Old format
+                preds,selectedFeats,stablFeats = results[1:]
+                preds_xgboost = None
+                preds_rf = None
             bestParams = None
             insamplePredictions = None
         case 2:
             preds,selectedFeats,bestParams = results[1:]
             stablFeats = None
             insamplePredictions = None
+            preds_xgboost = None
+            preds_rf = None
     preds.to_csv(Path(savePath,"cvPreds.csv"))
     selectedFeats.astype(int).to_csv(Path(savePath,"selectedFeats.csv"))
     if bestParams is not None:
@@ -200,6 +297,27 @@ def save_single_omic_results(y,results,savePath,taskType):
         insamplePredictions.to_csv(Path(savePath,"insamplePreds.csv"))
     if stablFeats is not None:
         stablFeats.to_csv(Path(savePath,"stablFeats.csv"))
+        
+        if preds_xgboost is not None:
+            preds_xgboost.to_csv(Path(savePath,"cvPreds_xgboost.csv"))
+            scores_xgboost = simpleScores(preds_xgboost,y,selectedFeats,taskType)
+            scores_xgboost.to_csv(Path(savePath,"cvScores_xgboost.csv"))
+            if taskType == "binary":
+                plot_roc(y,preds_xgboost.median(axis=1),show_fig=False,path=Path(savePath,"ROC_xgboost.png"),export_file=True)  
+                boxplot_binary_predictions(y,preds_xgboost.median(axis=1),show_fig=False,path=Path(savePath,"predBoxplot_xgboost.png"),export_file=True)
+            if taskType == "regression":
+                scatterplot_regression_predictions(y,preds_xgboost.median(axis=1),show_fig=False,path=Path(savePath,"scatterplot_xgboost.png"),export_file=True)
+
+        if preds_rf is not None:
+            preds_rf.to_csv(Path(savePath,"cvPreds_rf.csv"))
+            scores_rf = simpleScores(preds_rf,y,selectedFeats,taskType)
+            scores_rf.to_csv(Path(savePath,"cvScores_rf.csv"))
+            if taskType == "binary":
+                plot_roc(y,preds_rf.median(axis=1),show_fig=False,path=Path(savePath,"ROC_rf.png"),export_file=True)  
+                boxplot_binary_predictions(y,preds_rf.median(axis=1),show_fig=False,path=Path(savePath,"predBoxplot_rf.png"),export_file=True)
+            if taskType == "regression":
+                scatterplot_regression_predictions(y,preds_rf.median(axis=1),show_fig=False,path=Path(savePath,"scatterplot_rf.png"),export_file=True)
+
     featCount = selectedFeats.sum(axis=0).T.sort_values(ascending=False)
     featCount.to_csv(Path(savePath,"featCount.csv"))
 
@@ -208,31 +326,36 @@ def save_single_omic_results(y,results,savePath,taskType):
     if taskType == "binary":
         plot_roc(y,results[1].median(axis=1),show_fig=False,path=Path(savePath,"ROC.png"),export_file=True)  
         boxplot_binary_predictions(y,results[1].median(axis=1),show_fig=False,path=Path(savePath,"predBoxplot.png"),export_file=True)
+    elif taskType == "regression":
+        scatterplot_regression_predictions(y,results[1].median(axis=1),show_fig=False,path=Path(savePath,"scatterplot.png"),export_file=True)
 
         
 def late_fusion_combination_normal(
         y,
         oosPredictions,
-        isPredictions,
+        isPredictions
     ):
     """
-    data : pd.DataFrame
-        pandas DataFrame containing the original data
+    y : pd.Series
+        pandas Series containing the outcomes for the underlying datasets.
     oosPredictions : list of pd.DataFrames
-        for each omic, the pandas DataFrame containing the oos predictions
-    isPredictions : list of pd.DataFrames
-        for each omic, the in-sample predictions over each of the folds of the crosvalidation
-
+        for each omic, the out-of-sample predictions over each of the folds of the crossvalidation
+    isPredictions : list of pd.DataFramesr
+        for each omic, the in-sample predictions over each of the folds of the crossvalidation
     """
     folds= isPredictions[0].columns
     predictions = pd.DataFrame(index=y.index, columns=folds,dtype=float)
+    trainingPredictionsPerFold = {fold: [df[fold] for df in isPredictions] for fold in folds}
+    validationPredictionsPerFold = {fold: [pred[fold] for pred in oosPredictions] for fold in folds}
     for fold in folds:
-        foldData = pd.concat([df[fold] for df in isPredictions],axis=1).dropna(how="all",axis=0)
-        foldY = pd.concat([pred[fold] for pred in oosPredictions],axis=1).dropna(how="all",axis=0)
-        fitY = y.loc[foldData.index].to_numpy().flatten()
-        beta,_ = nnls(foldData.to_numpy(), fitY)
-        prediction = foldY.to_numpy() @ beta
-        predictions.loc[foldY.index, fold] = prediction
+        foldTrainData = pd.concat(trainingPredictionsPerFold[fold], axis=1).dropna(how="all", axis=0)
+        foldValidData = pd.concat(validationPredictionsPerFold[fold], axis=1).dropna(how="all", axis=0)
+        foldTrainData["intercept"] = 1
+        foldValidData["intercept"] = 1
+        foldTrainY = y.loc[foldTrainData.index].to_numpy().flatten()
+        beta,_ = nnls(foldTrainData.to_numpy(),foldTrainY)
+        prediction = foldValidData.to_numpy() @ beta
+        predictions.loc[foldValidData.index,fold] = prediction
     return predictions
 
 
