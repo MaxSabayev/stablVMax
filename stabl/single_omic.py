@@ -1,4 +1,4 @@
-from unionfind import UnionFind
+from .unionfind import UnionFind
 import sys
 from tqdm.autonotebook import tqdm
 from .preprocessing import remove_low_info_samples
