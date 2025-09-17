@@ -17,10 +17,10 @@ from sklearn.utils import safe_mask
 from sklearn.utils.class_weight import compute_sample_weight
 from sklearn.utils.validation import _check_feature_names_in, check_is_fitted
 from tqdm.autonotebook import tqdm
-from unionfind import UnionFind
+from .unionfind import UnionFind
 import warnings
-from utils import auto_mode_lambda_grid
-from visualization import boxplot_features, scatterplot_features
+from .utils import auto_mode_lambda_grid
+from .visualization import boxplot_features, scatterplot_features
 
 # Optional imports for XGBoost
 try:

@@ -17,13 +17,13 @@ import numpy as np
 from sklearn.model_selection import RepeatedStratifiedKFold, GroupShuffleSplit, GridSearchCV, RepeatedKFold
 from sklearn.linear_model import LogisticRegression, Lasso, ElasticNet, LinearRegression
 from sklearn.ensemble import RandomForestClassifier, RandomForestRegressor
-from stabl import Stabl, group_bootstrap
-from adaptive import ALogitLasso, ALasso
+from .stabl import Stabl, group_bootstrap
+from .adaptive import ALogitLasso, ALasso
 from sklearn.feature_selection import VarianceThreshold, SelectPercentile
 from sklearn.preprocessing import StandardScaler
 from sklearn.pipeline import Pipeline
 from sklearn.impute import SimpleImputer
-from preprocessing import LowInfoFilter
+from .preprocessing import LowInfoFilter
 
 # Optional imports for XGBoost
 try:

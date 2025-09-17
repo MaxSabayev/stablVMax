@@ -5,9 +5,9 @@ import numpy as np
 from sklearn.feature_selection._base import _get_feature_importances
 from sklearn.feature_selection._from_model import _calculate_threshold
 
-from utils import compute_CI, permutation_test_between_clfs
-from visualization import scatterplot_regression_predictions, boxplot_binary_predictions, plot_roc, plot_prc
-from metrics import jaccard_matrix
+from .utils import compute_CI, permutation_test_between_clfs
+from .visualization import scatterplot_regression_predictions, boxplot_binary_predictions, plot_roc, plot_prc
+from .metrics import jaccard_matrix
 from sklearn.metrics import roc_auc_score, average_precision_score, r2_score, mean_squared_error, mean_absolute_error
 
 from scipy import stats

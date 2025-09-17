@@ -1,10 +1,10 @@
-from EMS import read_json,unroll_parameters,write_json
+from .EMS import read_json,unroll_parameters,write_json
 from single_omic import simpleScores,late_fusion_combination_normal,late_fusion_combination_stabl
 import os
 import numpy as np
 import pandas as pd
-from pathlib import Path
-from visualization import boxplot_binary_predictions, plot_roc
+from pathlib import Path  
+from .visualization import boxplot_binary_predictions, plot_roc
 from string import Template
 
 defaultScriptTemplate = Template("""#!/usr/bin/bash

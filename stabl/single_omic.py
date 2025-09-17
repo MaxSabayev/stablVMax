@@ -1,7 +1,7 @@
 from unionfind import UnionFind
 import sys
 from tqdm.autonotebook import tqdm
-from preprocessing import remove_low_info_samples
+from .preprocessing import remove_low_info_samples
 from sklearn.preprocessing import StandardScaler
 from sklearn.pipeline import Pipeline
 from sklearn.linear_model import LogisticRegression, LinearRegression
@@ -15,9 +15,9 @@ import pandas as pd
 from sklearn.exceptions import ConvergenceWarning
 from sklearn.utils._testing import ignore_warnings
 from sklearn.metrics import roc_auc_score, average_precision_score, r2_score, mean_squared_error, mean_absolute_error
-from utils import compute_CI
-from metrics import jaccard_matrix
-from visualization import boxplot_binary_predictions, plot_roc, scatterplot_regression_predictions
+from .utils import compute_CI
+from .metrics import jaccard_matrix
+from .visualization import boxplot_binary_predictions, plot_roc, scatterplot_regression_predictions
 from pathlib import Path
 
 
