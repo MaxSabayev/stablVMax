@@ -123,7 +123,6 @@ def single_omic_simple(
         # train_idx, test_idx = y.iloc[train].index, y.iloc[test].index
         groups = outer_groups.iloc[train].values if outer_groups is not None else None
 
-        fold_selected_features = []
 
         X_train = data.iloc[train,:]
         X_test = data.iloc[test,:]
@@ -177,10 +176,10 @@ def single_omic_simple(
             "min FDP+": estimator.min_fdr_
             })
 
-            X_train = X_train[fold_selected_features]
-            X_test = X_test[fold_selected_features]
+            X_train = X_train[tmp_sel_features]
+            X_test = X_test[tmp_sel_features]
 
-            if len(fold_selected_features) > 0:
+            if len(tmp_sel_features) > 0:
                 # Standardization
                 X_train = fromPreprocessing(X_train,std_pipe)
                 X_test = fromPreprocessingRep(X_test,std_pipe)
@@ -196,7 +195,6 @@ def single_omic_simple(
                 else:
                     raise ValueError("task_type not recognized.")
 
-                # Store predictions for all variants
                 fold_predictions[test] = pred
                 fold_predictions_xgboost[test] = pred_xgboost
                 fold_predictions_rf[test] = pred_rf
