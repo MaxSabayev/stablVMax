@@ -162,28 +162,33 @@ def generateModel(paramSet: dict):
             lambdaGrid = [{b:paramSet[b] for b in paramSet["varNames"]}]
     elif paramSet["model"] == "stabl_randomForest":
         if paramSet["taskType"] == "binary":
-            submodel = RandomForestClassifier(n_estimators=paramSet["n_estimators"], 
+            submodel = RandomForestClassifier(n_estimators=paramSet["n_estimators"],
+                                              max_depth=paramSet["max_depth"],
                                             random_state=seed)
         else:
             submodel = RandomForestRegressor(n_estimators=paramSet["n_estimators"], 
+                                                max_depth=paramSet["max_depth"],
                                            random_state=seed)
     elif paramSet["model"] == "stabl_xgboost":
         paramSet["n_jobs"] = 1
         if not XGBOOST_AVAILABLE:
             raise ImportError("XGBoost is not available. Please install xgboost to use stabl_xgboost.")
         if paramSet["taskType"] == "binary":
-            submodel = XGBClassifier(n_estimators=paramSet["n_estimators"], 
+            submodel = XGBClassifier(n_estimators=paramSet["n_estimators"],
+                                     max_depth=paramSet["max_depth"], 
+                                        max_bin=paramSet["max_bin"],
                                    eval_metric="logloss", random_state=seed)
         else:
-            submodel = XGBRegressor(n_estimators=paramSet.get("n_estimators", 200), 
-                                  random_state=seed)
+            submodel = XGBRegressor(n_estimators=paramSet["n_estimators"],
+                                    max_depth=paramSet["max_depth"],
+                                    max_bin=paramSet["max_bin"],
+                                    random_state=seed)
         # case "sgl":
         #     submodel = LogisticSGL(max_iter=int(1e3), l1_ratio=0.5)
     else:
         raise Exception(f"Invalid model type: {paramSet['model']}")
     if lambdaGrid is None:
         lambdaGrid = {v:paramSet[v] for v in paramSet["varNames"]}
-        # Convert max_depth to integers for tree-based models
         if "max_depth" in lambdaGrid and isinstance(lambdaGrid["max_depth"], list):
             lambdaGrid["max_depth"] = [int(round(x)) for x in lambdaGrid["max_depth"]]
     if "stabl" in paramSet["model"]:
@@ -201,11 +206,10 @@ def generateModel(paramSet: dict):
                     verbose=1
                 )
     else:
-        # Choose appropriate cross-validation strategy based on task type
         if paramSet["taskType"] == "binary":
             chosen_inner_cv = RepeatedStratifiedKFold(n_splits=paramSet["innerCVvals"][0],n_repeats=paramSet["innerCVvals"][1], random_state=seed)
             scoring = "roc_auc"
-        else:  # regression
+        else:  
             chosen_inner_cv = RepeatedKFold(n_splits=paramSet["innerCVvals"][0],n_repeats=paramSet["innerCVvals"][1], random_state=seed)
             scoring = "r2"
         model = GridSearchCV(submodel, param_grid=lambdaGrid, 
