@@ -147,13 +147,7 @@ def run_end(paramsFile: str,
     organized_results_dir = Path("./results_organized/")
     organized_results_dir.mkdir(exist_ok=True)
     
-    # Create subdirectories for different result types
-    single_omic_dir = organized_results_dir / "single_omic"
-    early_fusion_dir = organized_results_dir / "early_fusion"
-    late_fusion_dir = organized_results_dir / "late_fusion"
-    
-    for dir_path in [single_omic_dir, early_fusion_dir, late_fusion_dir]:
-        dir_path.mkdir(exist_ok=True)
+
 
     intensities = [d for d in os.listdir(results_dir) if (results_dir / d).is_dir()]
     ef = "EarlyFusion" in params.get("datasets", [])
@@ -172,9 +166,9 @@ def run_end(paramsFile: str,
         task_type = param.get('taskType', 'binary')
         
         if variant:
-            identifier = f"{model_name}_{variant}_{task_type}_{dataset_type}_{exp_id}_{intensity}"
+            identifier = f"{model_name}_{variant}_{dataset_type}_{exp_id}_{intensity}"
         else:
-            identifier = f"{model_name}_{task_type}_{dataset_type}_{exp_id}_{intensity}"
+            identifier = f"{model_name}_{dataset_type}_{exp_id}_{intensity}"
         
         return identifier
 
@@ -183,7 +177,6 @@ def run_end(paramsFile: str,
             lfScores = simpleScores(lfPreds, y, selectedFeats, taskType)
             featCount = selectedFeats.sum(axis=0).T.sort_values(ascending=False)
             
-            # Create path with variant suffix if provided
             if variant_suffix:
                 pathLF = pathR / f"lf_{str(grp[0])}_{variant_suffix}"
             else:
@@ -195,7 +188,6 @@ def run_end(paramsFile: str,
                 p["variant"] = variant_suffix
             save_late_fusion_results(pathLF, p, featCount, lfScores, lfPreds, plot_results, taskType, y)
             
-            # Create clear model identifier
             model_id = create_model_identifier(p, str(grp[0]), pathR.name, "late_fusion", variant_suffix)
             lfScores.columns = [model_id]
             late_fusion_scores.append(lfScores)
@@ -221,11 +213,9 @@ def run_end(paramsFile: str,
                     existingParams.append(param)
                     exps.append(int(exp))
                     
-                    # Determine result type based on dataset
                     dataset_name = param.get('dataset', '')
                     is_early_fusion = dataset_name == "EarlyFusion"
                     
-                    # Process main scores
                     model_id = create_model_identifier(param, exp, intensity, 
                                                     "early_fusion" if is_early_fusion else "single_omic")
                     sc = pd.read_csv(cv_scores_path, index_col=0, names=[model_id], header=0)
@@ -235,14 +225,11 @@ def run_end(paramsFile: str,
                     else:
                         single_omic_scores.append(sc)
                     
-                    # Process STABL prediction variants (including random forest)
                     if "stabl" in param.get("model", ""):
-                        # Updated variants to include random forest
-                        variants = ["xgboost", "rf", "linear"]  # linear is the default
+                        variants = ["xgboost", "rf", "linear"]  
                         
                         for variant in variants:
                             if variant == "linear":
-                                # Skip linear as it's already processed above
                                 continue
                                 
                             variant_scores_path = exp_path / f"cvScores_{variant}.csv"
@@ -342,19 +329,19 @@ def run_end(paramsFile: str,
         return None
     
     # Save single-omic results
-    single_omic_results = save_organized_scores(single_omic_scores, single_omic_dir, "single_omic")
+    single_omic_results = save_organized_scores(single_omic_scores, organized_results_dir, "single_omic")
     if single_omic_results is not None and verbose:
-        print(f"Saved {len(single_omic_results)} single-omic results to {single_omic_dir}/single_omic_cvScores.csv")
+        print(f"Saved {len(single_omic_results)} single-omic results to {organized_results_dir}/single_omic_cvScores.csv")
     
     # Save early fusion results
-    early_fusion_results = save_organized_scores(early_fusion_scores, early_fusion_dir, "early_fusion")
+    early_fusion_results = save_organized_scores(early_fusion_scores, organized_results_dir, "early_fusion")
     if early_fusion_results is not None and verbose:
-        print(f"Saved {len(early_fusion_results)} early fusion results to {early_fusion_dir}/early_fusion_cvScores.csv")
+        print(f"Saved {len(early_fusion_results)} early fusion results to {organized_results_dir}/early_fusion_cvScores.csv")
     
     # Save late fusion results
-    late_fusion_results = save_organized_scores(late_fusion_scores, late_fusion_dir, "late_fusion")
+    late_fusion_results = save_organized_scores(late_fusion_scores, organized_results_dir, "late_fusion")
     if late_fusion_results is not None and verbose:
-        print(f"Saved {len(late_fusion_results)} late fusion results to {late_fusion_dir}/late_fusion_cvScores.csv")
+        print(f"Saved {len(late_fusion_results)} late fusion results to {organized_results_dir}/late_fusion_cvScores.csv")
     
     # Create a summary file with all results combined
     all_scores = []
@@ -365,18 +352,9 @@ def run_end(paramsFile: str,
     if late_fusion_results is not None:
         all_scores.append(late_fusion_results)
     
-    if all_scores:
-        combined_all = pd.concat(all_scores, axis=0)
-        combined_all.to_csv(organized_results_dir / "all_results_cvScores.csv")
-        if verbose:
-            print(f"Saved combined results summary to {organized_results_dir}/all_results_cvScores.csv")
-    
-    # Also save the legacy format for backward compatibility
-    legacy_scores = single_omic_scores + early_fusion_scores + late_fusion_scores
-    if legacy_scores:
-        legacy_combined = pd.concat(legacy_scores, axis=1).T.astype(float)
-        if len(legacy_combined.columns) > 0:
-            legacy_combined = legacy_combined.sort_values(by=legacy_combined.columns[0], ascending=False)
-        legacy_combined.to_csv("./results/cvScores.csv")
-        if verbose:
-            print("Saved legacy combined scores to ./results/cvScores.csv")
+    combined_all = pd.concat(all_scores, axis=0)
+    combined_all = combined_all.sort_values(by=combined_all.columns[0], ascending=False)
+    combined_all.to_csv(organized_results_dir / "all_results_cvScores.csv")
+    combined_all.to_csv("./results/cvScores.csv")
+    if verbose:
+        print(f"Saved combined results summary to {organized_results_dir}/all_results_cvScores.csv")
