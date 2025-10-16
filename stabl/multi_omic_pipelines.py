@@ -1,3 +1,5 @@
+import warnings
+warnings.filterwarnings("ignore", category=FutureWarning, module="xgboost.core")
 from unionfind import UnionFind
 import sys
 from tqdm.autonotebook import tqdm
@@ -17,7 +19,6 @@ from pathlib import Path
 import os
 import numpy as np
 import pandas as pd
-import warnings
 from sklearn.exceptions import ConvergenceWarning
 from sklearn.utils._testing import ignore_warnings
 
