@@ -163,24 +163,20 @@ def generateModel(paramSet: dict):
     elif paramSet["model"] == "stabl_randomForest":
         if paramSet["taskType"] == "binary":
             submodel = RandomForestClassifier(n_estimators=paramSet["n_estimators"],
-                                              max_depth=paramSet["max_depth"],
                                             random_state=seed)
         else:
             submodel = RandomForestRegressor(n_estimators=paramSet["n_estimators"], 
-                                                max_depth=paramSet["max_depth"],
                                            random_state=seed)
     elif paramSet["model"] == "stabl_xgboost":
         paramSet["n_jobs"] = 1
         if not XGBOOST_AVAILABLE:
             raise ImportError("XGBoost is not available. Please install xgboost to use stabl_xgboost.")
         if paramSet["taskType"] == "binary":
-            submodel = XGBClassifier(n_estimators=paramSet["n_estimators"],
-                                     max_depth=paramSet["max_depth"], 
+            submodel = XGBClassifier(n_estimators=paramSet["n_estimators"], 
                                         max_bin=paramSet["max_bin"],
                                    eval_metric="logloss", random_state=seed)
         else:
             submodel = XGBRegressor(n_estimators=paramSet["n_estimators"],
-                                    max_depth=paramSet["max_depth"],
                                     max_bin=paramSet["max_bin"],
                                     random_state=seed)
         # case "sgl":
