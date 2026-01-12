@@ -164,9 +164,11 @@ def generateModel(paramSet: dict):
     elif paramSet["model"] == "stabl_randomForest":
         if paramSet["taskType"] == "binary":
             submodel = RandomForestClassifier(n_estimators=paramSet["n_estimators"],
+                                            n_jobs=1,
                                             random_state=seed)
         else:
             submodel = RandomForestRegressor(n_estimators=paramSet["n_estimators"], 
+                                            n_jobs=1,
                                            random_state=seed)
     elif paramSet["model"] == "stabl_xgboost":
         paramSet["n_jobs"] = 1
@@ -175,10 +177,12 @@ def generateModel(paramSet: dict):
         if paramSet["taskType"] == "binary":
             submodel = XGBClassifier(n_estimators=paramSet["n_estimators"], 
                                         max_bin=paramSet["max_bin"],
+                                        n_jobs=1,
                                    eval_metric="logloss", random_state=seed)
         else:
             submodel = XGBRegressor(n_estimators=paramSet["n_estimators"],
                                     max_bin=paramSet["max_bin"],
+                                    n_jobs=1,
                                     random_state=seed)
         # case "sgl":
         #     submodel = LogisticSGL(max_iter=int(1e3), l1_ratio=0.5)

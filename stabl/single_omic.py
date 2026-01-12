@@ -25,10 +25,10 @@ from pathlib import Path
 
 logit = LogisticRegression(penalty=None, class_weight="balanced", max_iter=int(1e6))
 linreg = LinearRegression()
-randomforest=RandomForestRegressor(n_estimators=200, max_depth=5)
-randomforest_class=RandomForestClassifier(n_estimators=200, max_depth=5)
-xgboost = XGBRegressor()
-xgboost_class=XGBClassifier()
+randomforest=RandomForestRegressor(n_estimators=200, max_depth=5, n_jobs=1)
+randomforest_class=RandomForestClassifier(n_estimators=200, max_depth=5, n_jobs=1)
+xgboost = XGBRegressor(n_jobs =1)
+xgboost_class=XGBClassifier(n_jobs =1)
 
 std_pipe = Pipeline(
     steps=[
