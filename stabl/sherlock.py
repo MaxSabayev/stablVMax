@@ -1,3 +1,6 @@
+import warnings
+warnings.filterwarnings("ignore", category=FutureWarning, module="xgboost")
+
 from .EMS import read_json,unroll_parameters,write_json
 from .single_omic import simpleScores,late_fusion_combination_normal,late_fusion_combination_stabl
 import os

@@ -26,6 +26,8 @@ from .visualization import boxplot_features, scatterplot_features
 try:
     import xgboost as xgb
     XGBOOST_AVAILABLE = True
+    # Suppress XGBoost FutureWarnings
+    warnings.filterwarnings("ignore", category=FutureWarning, module="xgboost")
 except ImportError:
     XGBOOST_AVAILABLE = False
     xgb = None

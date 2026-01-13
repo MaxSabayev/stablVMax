@@ -1,6 +1,6 @@
 #!/usr/bin/env python3
 import warnings
-warnings.filterwarnings("ignore", category=FutureWarning, module="xgboost.core")
+warnings.filterwarnings("ignore", category=FutureWarning, module="xgboost")
 import copy
 import json
 import logging

@@ -1,5 +1,5 @@
 import warnings
-warnings.filterwarnings("ignore", category=FutureWarning, module="xgboost.core")
+warnings.filterwarnings("ignore", category=FutureWarning, module="xgboost")
 from unionfind import UnionFind
 import sys
 from tqdm.autonotebook import tqdm
