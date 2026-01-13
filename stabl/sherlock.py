@@ -18,6 +18,16 @@ defaultScriptTemplate = Template("""#!/usr/bin/bash
 #SBATCH --mem=${mem}GB
 
 ml python/3.12.1
+
+export OMP_NUM_THREADS=1
+export OPENBLAS_NUM_THREADS=1
+export MKL_NUM_THREADS=1
+export NUMEXPR_NUM_THREADS=1
+export VECLIB_MAXIMUM_THREADS=1
+export BLIS_NUM_THREADS=1
+
+export LOKY_MAX_CPU_COUNT=$SLURM_CPUS_PER_TASK
+
 time python3 ./sendOut.py 0 $${SLURM_ARRAY_TASK_ID} ${variant}
 """)
 
@@ -31,6 +41,16 @@ endScriptTemplate = Template("""#!/usr/bin/bash
 #SBATCH --mem=8GB
 
 ml python/3.12.1
+
+export OMP_NUM_THREADS=1
+export OPENBLAS_NUM_THREADS=1
+export MKL_NUM_THREADS=1
+export NUMEXPR_NUM_THREADS=1
+export VECLIB_MAXIMUM_THREADS=1
+export BLIS_NUM_THREADS=1
+
+export LOKY_MAX_CPU_COUNT=$SLURM_CPUS_PER_TASK
+
 time python3 ./sendOut.py 1
 """)
 
