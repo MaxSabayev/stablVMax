@@ -19,7 +19,7 @@ setuptools.setup(
         "scikit-learn==1.4.2",
         "seaborn>=0.13.0",
         "pandas==2.2.2",
-        "statsmodels==0.14.2",
+        "statsmodels==0.14.5",
         "openpyxl>=3.1.2",
         "adjustText==1.1.1",
         "scipy>=1.11.4",
