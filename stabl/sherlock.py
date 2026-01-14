@@ -1,4 +1,6 @@
 import warnings
+# Suppress XGBoost glibc FutureWarning
+warnings.filterwarnings("ignore", category=FutureWarning, message=".*glibc.*")
 warnings.filterwarnings("ignore", category=FutureWarning, module="xgboost")
 
 from .EMS import read_json,unroll_parameters,write_json

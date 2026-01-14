@@ -1,4 +1,6 @@
 import warnings
+# Suppress XGBoost glibc FutureWarning
+warnings.filterwarnings("ignore", category=FutureWarning, message=".*glibc.*")
 warnings.filterwarnings("ignore", category=FutureWarning, module="xgboost")
 from .unionfind import UnionFind
 import sys

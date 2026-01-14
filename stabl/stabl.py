@@ -2,6 +2,10 @@ import os
 from pathlib import Path
 from warnings import warn
 import sys
+import warnings
+# Suppress XGBoost glibc FutureWarning before any xgboost imports
+warnings.filterwarnings("ignore", category=FutureWarning, message=".*glibc.*")
+warnings.filterwarnings("ignore", category=FutureWarning, module="xgboost")
 
 import matplotlib.pyplot as plt
 import numpy as np
@@ -18,7 +22,6 @@ from sklearn.utils.class_weight import compute_sample_weight
 from sklearn.utils.validation import _check_feature_names_in, check_is_fitted
 from tqdm.autonotebook import tqdm
 from .unionfind import UnionFind
-import warnings
 from .utils import auto_mode_lambda_grid
 from .visualization import boxplot_features, scatterplot_features
 
@@ -26,8 +29,6 @@ from .visualization import boxplot_features, scatterplot_features
 try:
     import xgboost as xgb
     XGBOOST_AVAILABLE = True
-    # Suppress XGBoost FutureWarnings
-    warnings.filterwarnings("ignore", category=FutureWarning, module="xgboost")
 except ImportError:
     XGBOOST_AVAILABLE = False
     xgb = None
